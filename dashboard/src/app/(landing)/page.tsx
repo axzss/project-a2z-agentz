@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
-import { Bot, Shield, Cpu, Activity, ArrowRight, Zap, Sparkles } from "lucide-react";
+import { Bot, Shield, Cpu, ArrowRight } from "lucide-react";
 
 import AgentScene from "@/components/landing/AgentScene";
 
@@ -41,7 +42,7 @@ export default function LandingPage() {
               border: "1px solid var(--color-border-brand-subtle)",
             }}
           >
-            <img src="/images/logo/logo.svg" className="w-6 h-6 md:w-8 md:h-8 object-contain" alt="A2Z Logo" />
+            <Image src="/images/logo/logo.svg" width={32} height={32} className="w-6 h-6 md:w-8 md:h-8 object-contain" alt="A2Z Logo" />
           </div>
           <div>
             <h1 className="text-sm md:text-base font-bold text-[var(--color-heading)] leading-none" style={{ fontFamily: "var(--font-serif)" }}>
@@ -197,10 +198,12 @@ export default function LandingPage() {
               {/* Console Body containing the 16:9 GIF */}
               <div className="relative aspect-[16/9] w-full bg-[#13111C]/90 overflow-hidden flex items-center justify-center">
                 {/* The GIF Animation */}
-                <img 
-                  src="/gif/A2Z-animation.gif" 
-                  alt="Autonomous Agent-to-Agent Web3 Scavenger Interaction" 
-                  className="w-full h-full object-cover pointer-events-none select-none opacity-90 group-hover:opacity-100 transition-opacity duration-500"
+                <Image
+                  src="/gif/A2Z-animation.gif"
+                  alt="Autonomous Agent-to-Agent Web3 Scavenger Interaction"
+                  fill
+                  unoptimized
+                  className="object-cover pointer-events-none select-none opacity-90 group-hover:opacity-100 transition-opacity duration-500"
                 />
 
                 {/* Grid Scan Line Effect */}

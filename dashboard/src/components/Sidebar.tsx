@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useDashboard } from "./DashboardContext";
@@ -54,7 +55,7 @@ export default function Sidebar() {
           className="flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center overflow-hidden"
           style={{ background: "var(--color-neutral-secondary-medium)", border: "1px solid var(--color-border-brand-subtle)" }}
         >
-          <img src="/images/logo/logo.svg" className="w-7 h-7 object-contain" alt="A2Z Logo" />
+          <Image src="/images/logo/logo.svg" width={28} height={28} className="w-7 h-7 object-contain" alt="A2Z Logo" />
         </div>
         <AnimatePresence>
           {sidebarOpen && (

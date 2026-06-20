@@ -53,7 +53,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Fetch user on mount
   useEffect(() => {
-    refresh();
+    const timeout = window.setTimeout(() => {
+      refresh();
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, [refresh]);
 
   const handleLogin = useCallback(

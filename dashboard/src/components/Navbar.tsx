@@ -9,7 +9,7 @@ import { NotificationsPanel } from "./ui/NotificationsPanel";
 import { motion } from "motion/react";
 
 export default function Navbar() {
-  const { kpiMetrics, agentAStatus, agentBStatus, setSidebarOpen } = useDashboard();
+  const { agentAStatus, agentBStatus, setSidebarOpen } = useDashboard();
   const { user, loading, logout } = useAuth();
 
   return (

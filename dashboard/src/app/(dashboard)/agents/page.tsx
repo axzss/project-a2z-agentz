@@ -4,7 +4,7 @@ import { motion } from "motion/react";
 import { useDashboard, type AgentHealth } from "@/components/DashboardContext";
 import PageHeader from "@/components/PageHeader";
 import { Sparkline } from "@/components/ui/Sparkline";
-import { Bot, Shield, Activity, Zap, Clock, CheckCircle2, XCircle, ListChecks, Pause, Play, Link2 } from "lucide-react";
+import { Bot, Activity, Zap, Clock, CheckCircle2, XCircle, ListChecks, Pause, Play, Link2 } from "lucide-react";
 
 function genSpark(base: number, n = 12): number[] {
   let v = base;

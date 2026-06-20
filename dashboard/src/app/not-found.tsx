@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { motion } from "motion/react";
 import { ArrowLeft, Home } from "lucide-react";
 import Link from "next/link";
@@ -21,7 +22,7 @@ export default function NotFound() {
             boxShadow: "0 8px 32px var(--color-glow-brand)",
           }}
         >
-          <img src="/images/logo/logo.svg" className="w-14 h-14 object-contain" alt="A2Z Logo" />
+          <Image src="/images/logo/logo.svg" width={56} height={56} className="w-14 h-14 object-contain" alt="A2Z Logo" />
         </div>
         <h1
           className="text-7xl font-bold mb-2 tabular-nums"

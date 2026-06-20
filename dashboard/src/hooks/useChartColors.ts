@@ -1,5 +1,4 @@
 'use client';
-import { useEffect, useState } from 'react';
 import { useTheme } from './useTheme';
 
 const STATIC_FALLBACKS = {
@@ -31,32 +30,19 @@ const STATIC_FALLBACKS = {
 
 export function useChartColors() {
   const { resolvedTheme } = useTheme();
-  const [colors, setColors] = useState<{
-    primary: string;
-    secondary: string;
-    glow: string;
-    accent: string;
-    brand: string;
-    success: string;
-    danger: string;
-    warning: string;
-    grid: string;
-    muted: string;
-  }>(STATIC_FALLBACKS[resolvedTheme]);
+  const themeFallbacks = STATIC_FALLBACKS[resolvedTheme];
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined') return { colors: themeFallbacks };
 
-    const rootStyle = window.getComputedStyle(document.documentElement);
-    
-    const getVal = (varName: string, fallback: string): string => {
-      const val = rootStyle.getPropertyValue(varName).trim();
-      return val || fallback;
-    };
+  const rootStyle = window.getComputedStyle(document.documentElement);
 
-    const themeFallbacks = STATIC_FALLBACKS[resolvedTheme];
+  const getVal = (varName: string, fallback: string): string => {
+    const val = rootStyle.getPropertyValue(varName).trim();
+    return val || fallback;
+  };
 
-    const targetColors = {
+  return {
+    colors: {
       primary: getVal('--color-chart-primary', themeFallbacks.primary),
       secondary: getVal('--color-chart-secondary', themeFallbacks.secondary),
       glow: getVal('--color-chart-glow', themeFallbacks.glow),
@@ -67,10 +53,6 @@ export function useChartColors() {
       warning: getVal('--color-chart-warning', themeFallbacks.warning),
       grid: getVal('--color-chart-grid', themeFallbacks.grid),
       muted: getVal('--color-chart-muted', themeFallbacks.muted),
-    };
-
-    setColors(targetColors);
-  }, [resolvedTheme]);
-
-  return { colors };
+    },
+  };
 }

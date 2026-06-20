@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { Sparkles, X, ChevronRight, Check } from "lucide-react";
@@ -21,10 +21,8 @@ const STEPS: Step[] = [
 export function OnboardingTour() {
   const { preferences, setPreferences } = useDashboard();
   const [step, setStep] = useState(0);
-  const [mounted, setMounted] = useState(false);
 
-  useEffect(() => setMounted(true), []);
-  if (!mounted || typeof document === "undefined") return null;
+  if (typeof document === "undefined") return null;
 
   const open = !preferences.onboarded;
   if (!open) return null;
