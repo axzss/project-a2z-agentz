@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import {
   detectWalletProviders,
   formatAddress,
@@ -13,19 +13,14 @@ import {
 export type WalletConnectState = "idle" | "connecting" | "connected" | "error";
 
 export function useWalletConnect() {
-  const [wallets, setWallets] = useState<WalletOption[]>([]);
-  const [session, setSession] = useState<WalletSession | null>(null);
+  const [wallets, setWallets] = useState<WalletOption[]>(() => detectWalletProviders());
+  const [session, setSession] = useState<WalletSession | null>(() => getWalletSession());
   const [state, setState] = useState<WalletConnectState>("idle");
   const [error, setError] = useState<string | null>(null);
 
   const refreshWallets = useCallback(() => {
     setWallets(detectWalletProviders());
   }, []);
-
-  useEffect(() => {
-    refreshWallets();
-    setSession(getWalletSession());
-  }, [refreshWallets]);
 
   const connect = useCallback(async (wallet: WalletOption) => {
     if (!wallet.provider) {

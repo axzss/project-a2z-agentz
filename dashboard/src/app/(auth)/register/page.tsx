@@ -2,18 +2,22 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { Mail, Lock, Wallet, UserPlus, Loader2 } from "lucide-react";
 import { useAuth } from "@/components/AuthProvider";
+import WalletConnectModal from "@/components/WalletConnectModal";
 
 export default function RegisterPage() {
   const { register } = useAuth();
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [walletAddress, setWalletAddress] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+  const [walletModalOpen, setWalletModalOpen] = useState(false);
 
   const validate = (): boolean => {
     const e: Record<string, string> = {};
@@ -294,6 +298,20 @@ export default function RegisterPage() {
                 {errors.walletAddress}
               </p>
             )}
+            <button
+              type="button"
+              onClick={() => setWalletModalOpen(true)}
+              className="mt-2 w-full py-2.5 rounded-xl text-sm font-medium border transition-all hover:opacity-80 focus-ring flex items-center justify-center gap-2"
+              style={{
+                borderColor: "var(--color-border-default)",
+                color: "var(--color-body)",
+                background: "var(--color-neutral-secondary-medium)",
+              }}
+              aria-label="Connect wallet to registration"
+            >
+              <Wallet className="w-4 h-4" aria-hidden="true" />
+              Connect Wallet
+            </button>
           </div>
 
           {/* Submit */}
@@ -340,6 +358,12 @@ export default function RegisterPage() {
           </Link>
         </p>
       </div>
+      <WalletConnectModal
+        open={walletModalOpen}
+        onClose={() => setWalletModalOpen(false)}
+        onConnected={(session) => setWalletAddress(session.address)}
+        onContinue={() => router.push("/dashboard")}
+      />
     </motion.div>
   );
 }
