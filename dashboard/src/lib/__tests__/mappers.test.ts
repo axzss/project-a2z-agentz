@@ -62,6 +62,6 @@ describe("mapRawTxToTransaction", () => {
     expect(tx.targetAddress).toBe("0xaddr");
     expect(tx.amountUsd).toBe(1.5);
     expect(tx.txHash).toBe("0xhash1");
-    expect(tx.timestamp).toEqual(new Date("2026-06-21T10:00:00"));
+    expect(tx.timestamp).toEqual(new Date("2026-06-21T10:00:00Z"));
   });
 });
