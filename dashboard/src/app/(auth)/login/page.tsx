@@ -287,13 +287,12 @@ export default function LoginPage() {
           </Link>
         </p>
       </div>
+      <WalletConnectModal
+        open={walletModalOpen}
+        onClose={() => setWalletModalOpen(false)}
+        onContinue={() => router.push("/dashboard")}
+      />
     </motion.div>
-
-    <WalletConnectModal
-      open={walletModalOpen}
-      onClose={() => setWalletModalOpen(false)}
-      onContinue={() => router.push("/dashboard")}
-    />
     </>
   );
 }

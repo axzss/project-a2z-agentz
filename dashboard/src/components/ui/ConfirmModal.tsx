@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { motion, AnimatePresence } from "motion/react";
 import { AlertTriangle, AlertCircle, Info, X } from "lucide-react";
@@ -30,13 +30,8 @@ export function ConfirmModal({
   confirmLabel = "Confirm", cancelLabel = "Cancel", onConfirm, onCancel,
 }: ConfirmModalProps) {
   const confirmRef = useRef<HTMLButtonElement>(null);
-  const [mounted, setMounted] = useState(false);
   const v = VARIANT[variant];
   const Icon = v.icon;
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   useEffect(() => {
     if (!open) return;
@@ -49,7 +44,7 @@ export function ConfirmModal({
     return () => window.removeEventListener("keydown", handler);
   }, [open, onCancel, onConfirm]);
 
-  if (!mounted || typeof document === "undefined") return null;
+  if (typeof document === "undefined") return null;
 
   return createPortal(
     <AnimatePresence>

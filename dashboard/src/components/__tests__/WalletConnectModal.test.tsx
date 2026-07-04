@@ -24,10 +24,10 @@ describe("WalletConnectModal", () => {
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 
-  it("renders wallet options when open", () => {
+  it("renders wallet options when open", async () => {
     render(<WalletConnectModal open onClose={vi.fn()} />);
     expect(screen.getByRole("dialog")).toBeTruthy();
-    expect(screen.getByText("MetaMask")).toBeTruthy();
+    expect(await screen.findByText("MetaMask")).toBeTruthy();
     expect(screen.getByText("Coinbase Wallet")).toBeTruthy();
     expect(screen.getByText("Rabby")).toBeTruthy();
     expect(screen.getByText("Browser Wallet")).toBeTruthy();
@@ -35,7 +35,9 @@ describe("WalletConnectModal", () => {
 
   it("connects detected wallet and shows SIWE warning", async () => {
     const request = vi.fn(async ({ method }: { method: string }) => {
-      if (method === "eth_requestAccounts") return ["0x1234567890abcdef1234567890abcdef12345678"];
+      if (method === "eth_requestAccounts") {
+        return ["0x1234567890abcdef1234567890abcdef12345678"];
+      }
       if (method === "eth_chainId") return "0x2105";
       return null;
     });
@@ -43,13 +45,15 @@ describe("WalletConnectModal", () => {
     const onConnected = vi.fn();
 
     render(<WalletConnectModal open onClose={vi.fn()} onConnected={onConnected} />);
-    await userEvent.click(screen.getByRole("button", { name: /connect metamask/i }));
+    await userEvent.click(await screen.findByRole("button", { name: /connect metamask/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/Wallet login is frontend-only/i)).toBeTruthy();
     });
     expect(screen.getByText(/0x1234...5678/i)).toBeTruthy();
-    expect(onConnected).toHaveBeenCalledWith(expect.objectContaining({ address: "0x1234567890abcdef1234567890abcdef12345678" }));
+    expect(onConnected).toHaveBeenCalledWith(
+      expect.objectContaining({ address: "0x1234567890abcdef1234567890abcdef12345678" })
+    );
   });
 
   it("shows rejected connection error", async () => {
@@ -59,7 +63,7 @@ describe("WalletConnectModal", () => {
     setEthereum({ isMetaMask: true, request });
 
     render(<WalletConnectModal open onClose={vi.fn()} />);
-    await userEvent.click(screen.getByRole("button", { name: /connect metamask/i }));
+    await userEvent.click(await screen.findByRole("button", { name: /connect metamask/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/Connection rejected/i)).toBeTruthy();
@@ -68,7 +72,9 @@ describe("WalletConnectModal", () => {
 
   it("calls onContinue when continue button is clicked", async () => {
     const request = vi.fn(async ({ method }: { method: string }) => {
-      if (method === "eth_requestAccounts") return ["0x1234567890abcdef1234567890abcdef12345678"];
+      if (method === "eth_requestAccounts") {
+        return ["0x1234567890abcdef1234567890abcdef12345678"];
+      }
       if (method === "eth_chainId") return "0x2105";
       return null;
     });
@@ -76,7 +82,7 @@ describe("WalletConnectModal", () => {
     const onContinue = vi.fn();
 
     render(<WalletConnectModal open onClose={vi.fn()} onContinue={onContinue} />);
-    await userEvent.click(screen.getByRole("button", { name: /connect metamask/i }));
+    await userEvent.click(await screen.findByRole("button", { name: /connect metamask/i }));
     await userEvent.click(await screen.findByRole("button", { name: /continue to dashboard/i }));
 
     expect(onContinue).toHaveBeenCalled();
@@ -87,7 +93,7 @@ describe("WalletConnectModal", () => {
     render(<WalletConnectModal open onClose={vi.fn()} onContinue={onContinue} />);
     
     // In demo mode, even if "install required", clicking should generate a mock connection
-    await userEvent.click(screen.getByRole("button", { name: /connect metamask/i }));
+    await userEvent.click(await screen.findByRole("button", { name: /connect metamask/i }));
     
     await waitFor(() => {
       expect(screen.getByText(/Wallet login is frontend-only/i)).toBeTruthy();

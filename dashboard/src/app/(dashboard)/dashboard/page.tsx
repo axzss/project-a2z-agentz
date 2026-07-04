@@ -9,8 +9,8 @@ import DashboardKpis from "@/components/DashboardKpis";
 import PageHeader from "@/components/PageHeader";
 import AgentCommPanel from "@/components/AgentCommPanel";
 import A2AIdentityReadiness from "@/components/A2AIdentityReadiness";
-import { useDashboard } from "@/components/DashboardContext";
 import { useAuth } from "@/components/AuthProvider";
+import { useDashboard } from "@/components/DashboardContext";
 import { LayoutDashboard } from "lucide-react";
 
 const containerVariants = {

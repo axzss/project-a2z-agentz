@@ -1,69 +1,129 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { Link2, ShieldCheck, Radio } from "lucide-react";
+import { AlertTriangle, Link2, Radio, ShieldCheck, Wallet } from "lucide-react";
 import { formatAddress, getWalletSession, type WalletSession } from "@/lib/wallet";
 import type { User } from "@/lib/auth";
 
-interface Props {
-  wsStatus: "connecting" | "connected" | "disconnected";
+type WsStatus = "connecting" | "connected" | "disconnected";
+
+interface A2AIdentityReadinessProps {
+  wsStatus: WsStatus;
   user: User | null;
 }
 
-function wsLabel(status: Props["wsStatus"]) {
-  if (status === "connected") return "Connected";
-  if (status === "connecting") return "Connecting";
-  return "Fallback / Demo Mode";
-}
+const wsStatusLabels: Record<WsStatus, string> = {
+  connected: "Connected",
+  connecting: "Connecting",
+  disconnected: "Fallback / Demo Mode",
+};
 
-export default function A2AIdentityReadiness({ wsStatus, user }: Props) {
-  const [session, setSession] = useState<WalletSession | null>(null);
+export default function A2AIdentityReadiness({ wsStatus, user }: A2AIdentityReadinessProps) {
+  const [walletSession, setWalletSession] = useState<WalletSession | null>(null);
 
   useEffect(() => {
-    setSession(getWalletSession());
+    setWalletSession(getWalletSession());
   }, []);
 
-  const walletConnected = Boolean(session?.address);
-  const backendAuthTitle = user ? "JWT Authenticated" : walletConnected ? "Frontend wallet session" : "Auth unknown";
-  const backendAuthDescription = user ? "Email/password backend session active" : walletConnected ? "SIWE endpoint needed" : "Backend unavailable or not signed in";
+  const backendStatus = user
+    ? "JWT Authenticated"
+    : walletSession
+      ? "Frontend wallet session"
+      : "Auth unknown";
+
+  const cards = [
+    {
+      title: "Wallet Session",
+      status: walletSession ? "Connected wallet" : "Not connected",
+      detail: walletSession
+        ? `${walletSession.walletName} · ${formatAddress(walletSession.address)}`
+        : "Connect an EVM wallet from login/register for frontend dashboard access.",
+      icon: Wallet,
+    },
+    {
+      title: "Backend Auth",
+      status: backendStatus,
+      detail: user?.email ?? "Protected backend API calls still require email/password JWT until SIWE is available.",
+      icon: ShieldCheck,
+    },
+    {
+      title: "A2A WebSocket",
+      status: wsStatusLabels[wsStatus],
+      detail: "Agent-to-Agent telemetry channel for Mission Control readiness.",
+      icon: Radio,
+    },
+  ];
 
   return (
-    <section className="rounded-2xl border p-5" style={{ background: "color-mix(in srgb, var(--color-surface) 84%, transparent)", borderColor: "var(--color-border-default)" }}>
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+    <section className="card p-5" aria-labelledby="a2a-identity-readiness-title">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <p className="text-xs uppercase tracking-[0.18em]" style={{ color: "var(--color-fg-purple)" }}>Agent-to-Agent Backend</p>
-          <h2 className="mt-1 text-xl font-bold" style={{ color: "var(--color-heading)" }}>Identity Handshake Status</h2>
-          <p className="mt-1 text-sm" style={{ color: "var(--color-body-subtle)" }}>Tracks wallet session, backend auth readiness, and A2A WebSocket state.</p>
-        </div>
-        <span className="rounded-full border px-3 py-1 text-xs font-semibold" style={{ color: "var(--color-fg-warning)", borderColor: "var(--color-border-warning)", background: "var(--color-bg-warning-subtle)" }}>SIWE Pending</span>
-      </div>
-
-      <div className="mt-5 grid gap-3 md:grid-cols-3">
-        <div className="rounded-xl border p-4" style={{ borderColor: "var(--color-border-default)", background: "var(--color-neutral-secondary-medium)" }}>
-          <Link2 className="h-4 w-4" style={{ color: "var(--color-fg-success)" }} aria-hidden="true" />
-          <p className="mt-3 text-xs" style={{ color: "var(--color-body-subtle)" }}>Wallet Session</p>
-          <h3 className="mt-2 font-semibold" style={{ color: walletConnected ? "var(--color-fg-success)" : "var(--color-body)" }}>{walletConnected ? "Connected" : "Not connected"}</h3>
-          <p className="mt-1 text-xs font-mono" style={{ color: "var(--color-body-subtle)" }}>{walletConnected ? `${session?.walletName} · ${formatAddress(session?.address ?? "")}` : "Use Connect Wallet from login/register"}</p>
-        </div>
-
-        <div className="rounded-xl border p-4" style={{ borderColor: "var(--color-border-default)", background: "var(--color-neutral-secondary-medium)" }}>
-          <ShieldCheck className="h-4 w-4" style={{ color: user ? "var(--color-fg-success)" : "var(--color-fg-warning)" }} aria-hidden="true" />
-          <p className="mt-3 text-xs" style={{ color: "var(--color-body-subtle)" }}>Backend Auth</p>
-          <h3 className="mt-2 font-semibold" style={{ color: user ? "var(--color-fg-success)" : "var(--color-fg-warning)" }}>{backendAuthTitle}</h3>
-          <p className="mt-1 text-xs" style={{ color: "var(--color-body-subtle)" }}>{backendAuthDescription}</p>
-        </div>
-
-        <div className="rounded-xl border p-4" style={{ borderColor: "var(--color-border-default)", background: "var(--color-neutral-secondary-medium)" }}>
-          <Radio className="h-4 w-4" style={{ color: "var(--color-fg-cyan)" }} aria-hidden="true" />
-          <p className="mt-3 text-xs" style={{ color: "var(--color-body-subtle)" }}>A2A WebSocket</p>
-          <h3 className="mt-2 font-semibold" style={{ color: "var(--color-fg-cyan)" }}>{wsLabel(wsStatus)}</h3>
-          <p className="mt-1 text-xs" style={{ color: "var(--color-body-subtle)" }}>Agent A ↔ Agent B sync</p>
+          <div className="flex items-center gap-2 text-sm font-medium text-[var(--color-body-subtle)]">
+            <Link2 className="h-4 w-4" aria-hidden="true" />
+            Hybrid Wallet / Backend Auth
+          </div>
+          <h2
+            id="a2a-identity-readiness-title"
+            className="mt-1 text-base font-semibold text-[var(--color-heading)]"
+            style={{ fontFamily: "var(--font-serif)" }}
+          >
+            A2A Identity & Backend Readiness
+          </h2>
+          <p className="mt-1 text-sm text-[var(--color-body-subtle)]">
+            Frontend wallet connect is available while backend SIWE remains a planned milestone.
+          </p>
         </div>
       </div>
 
-      <p className="mt-4 rounded-xl border p-3 text-xs leading-relaxed" style={{ color: "var(--color-fg-warning)", borderColor: "var(--color-border-warning)", background: "var(--color-bg-warning-subtle)" }}>
-        Wallet connect is ready on the frontend. Backend sign-in-with-wallet is pending. Next backend milestone: add SIWE challenge/verify endpoint and issue the same auth cookie used by email login.
-      </p>
+      <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
+        {cards.map((card) => {
+          const Icon = card.icon;
+          return (
+            <div
+              key={card.title}
+              className="rounded-2xl border p-4"
+              style={{
+                borderColor: "var(--color-border-default)",
+                background: "var(--color-neutral-primary-soft)",
+              }}
+            >
+              <div className="flex items-start gap-3">
+                <div
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl"
+                  style={{
+                    background: "var(--color-neutral-secondary-medium)",
+                    border: "1px solid var(--color-border-default)",
+                  }}
+                >
+                  <Icon className="h-5 w-5 text-[var(--color-body-subtle)]" aria-hidden="true" />
+                </div>
+                <div>
+                  <p className="text-xs font-medium uppercase tracking-[0.18em] text-[var(--color-body-muted)]">
+                    {card.title}
+                  </p>
+                  <p className="mt-1 text-sm font-semibold text-[var(--color-heading)]">{card.status}</p>
+                  <p className="mt-1 text-sm text-[var(--color-body-subtle)]">{card.detail}</p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div
+        className="mt-4 flex items-start gap-3 rounded-2xl p-4 text-sm"
+        style={{
+          background: "var(--color-warning-soft)",
+          border: "1px solid var(--color-border-warning-subtle)",
+          color: "var(--color-fg-warning)",
+        }}
+      >
+        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+        <p>
+          Wallet connect is ready on the frontend. Backend sign-in-with-wallet is pending. Next backend
+          milestone: add SIWE challenge/verify endpoint and issue the same auth cookie used by email login.
+        </p>
+      </div>
     </section>
   );
 }

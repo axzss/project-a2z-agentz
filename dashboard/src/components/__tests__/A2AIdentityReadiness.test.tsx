@@ -2,45 +2,53 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import React from "react";
 import A2AIdentityReadiness from "../A2AIdentityReadiness";
-import { WALLET_SESSION_KEY, type WalletSession } from "@/lib/wallet";
+import { saveWalletSession, clearWalletSession } from "@/lib/wallet";
 
-function saveSession(session: WalletSession) {
-  localStorage.setItem(WALLET_SESSION_KEY, JSON.stringify(session));
-}
+const user = {
+  id: 1,
+  email: "operator@example.com",
+  wallet_address: null,
+};
 
 describe("A2AIdentityReadiness", () => {
   beforeEach(() => {
     localStorage.clear();
+    clearWalletSession();
   });
 
-  it("shows not connected when no wallet session exists", () => {
-    render(<A2AIdentityReadiness wsStatus="disconnected" user={null} />);
-    expect(screen.getByText("Identity Handshake Status")).toBeTruthy();
+  it("shows JWT backend auth and connected A2A websocket", () => {
+    render(<A2AIdentityReadiness wsStatus="connected" user={user} />);
+
+    expect(screen.getByText("A2A Identity & Backend Readiness")).toBeTruthy();
+    expect(screen.getByText("JWT Authenticated")).toBeTruthy();
+    expect(screen.getByText("operator@example.com")).toBeTruthy();
+    expect(screen.getByText("Connected")).toBeTruthy();
     expect(screen.getByText("Not connected")).toBeTruthy();
-    expect(screen.getByText("Fallback / Demo Mode")).toBeTruthy();
   });
 
-  it("shows connected wallet and frontend auth state", () => {
-    saveSession({
+  it("shows frontend wallet session and SIWE backend milestone", () => {
+    saveWalletSession({
       address: "0x1234567890abcdef1234567890abcdef12345678",
       walletName: "MetaMask",
       chainId: "0x2105",
       connectedAt: "2026-06-21T00:00:00.000Z",
-      connected: true, // matching EIP-1193 session indicator structure if any
       frontendOnly: true,
-    } as any);
+    });
 
-    render(<A2AIdentityReadiness wsStatus="connected" user={null} />);
-    // Check elements
-    const connectedHeaders = screen.getAllByRole("heading", { name: "Connected" });
-    expect(connectedHeaders.length).toBeGreaterThan(0);
-    expect(screen.getByText("MetaMask · 0x1234...5678")).toBeTruthy();
+    render(<A2AIdentityReadiness wsStatus="disconnected" user={null} />);
+
+    expect(screen.getByText("Connected wallet")).toBeTruthy();
+    expect(screen.getByText(/MetaMask · 0x1234\.\.\.5678/)).toBeTruthy();
     expect(screen.getByText("Frontend wallet session")).toBeTruthy();
+    expect(screen.getByText("Fallback / Demo Mode")).toBeTruthy();
+    expect(screen.getByText(/Next backend milestone: add SIWE challenge\/verify endpoint/i)).toBeTruthy();
   });
 
-  it("shows JWT authenticated when user exists", () => {
-    render(<A2AIdentityReadiness wsStatus="connecting" user={{ id: 1, email: "u@b.io" }} />);
-    expect(screen.getByText("JWT Authenticated")).toBeTruthy();
+  it("shows unknown auth and connecting websocket when neither JWT nor wallet exists", () => {
+    render(<A2AIdentityReadiness wsStatus="connecting" user={null} />);
+
+    expect(screen.getByText("Auth unknown")).toBeTruthy();
     expect(screen.getByText("Connecting")).toBeTruthy();
+    expect(screen.getByText("Protected backend API calls still require email/password JWT until SIWE is available.")).toBeTruthy();
   });
 });

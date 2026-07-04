@@ -2,7 +2,11 @@ export const WALLET_SESSION_KEY = "a2z-wallet-session";
 export const WALLET_SESSION_COOKIE = "a2z-wallet-session";
 
 export type WalletId = "metamask" | "coinbase" | "rabby" | "injected";
-export type WalletStatus = "detected" | "available" | "install_required" | "open_wallet_browser";
+export type WalletStatus =
+  | "detected"
+  | "available"
+  | "install_required"
+  | "open_wallet_browser";
 
 export interface Eip1193Provider {
   request(args: { method: string; params?: unknown[] | object }): Promise<unknown>;
@@ -46,7 +50,9 @@ function isMobileUserAgent() {
 function allInjectedProviders(): Eip1193Provider[] {
   if (!isBrowser() || !window.ethereum) return [];
   const root = window.ethereum;
-  return Array.isArray(root.providers) && root.providers.length > 0 ? root.providers : [root];
+  return Array.isArray(root.providers) && root.providers.length > 0
+    ? root.providers
+    : [root];
 }
 
 function fallbackStatus(): WalletStatus {
@@ -55,12 +61,18 @@ function fallbackStatus(): WalletStatus {
 
 export function detectWalletProviders(): WalletOption[] {
   const providers = allInjectedProviders();
-  const findProvider = (predicate: (provider: Eip1193Provider) => boolean) => providers.find(predicate);
+  const findProvider = (predicate: (provider: Eip1193Provider) => boolean) =>
+    providers.find(predicate);
 
-  const metamask = findProvider((provider) => provider.isMetaMask === true && provider.isRabby !== true);
+  const metamask = findProvider(
+    (provider) => provider.isMetaMask === true && provider.isRabby !== true
+  );
   const coinbase = findProvider((provider) => provider.isCoinbaseWallet === true);
   const rabby = findProvider((provider) => provider.isRabby === true);
-  const generic = providers.find((provider) => provider !== metamask && provider !== coinbase && provider !== rabby) ?? providers[0];
+  const generic =
+    providers.find(
+      (provider) => provider !== metamask && provider !== coinbase && provider !== rabby
+    ) ?? providers[0];
   const noProviderStatus = fallbackStatus();
 
   return [
@@ -111,9 +123,12 @@ export function getWalletSession(): WalletSession | null {
   if (!isBrowser()) return null;
   const raw = window.localStorage.getItem(WALLET_SESSION_KEY);
   if (!raw) return null;
+
   try {
     const parsed = JSON.parse(raw) as WalletSession;
-    if (!parsed.address || !parsed.walletName || parsed.frontendOnly !== true) return null;
+    if (!parsed.address || !parsed.walletName || parsed.frontendOnly !== true) {
+      return null;
+    }
     return parsed;
   } catch {
     return null;

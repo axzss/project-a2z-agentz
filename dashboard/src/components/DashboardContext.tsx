@@ -305,7 +305,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [agentAStatus, setAgentAStatus] = useState<AgentStatus>("online");
-  const [agentBStatus, setAgentBStatus] = useState<AgentStatus>("online");
+  const agentBStatus: AgentStatus = "online";
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [approvalQueue, setApprovalQueue] = useState<ApprovalItem[]>([]);
   const [logs, setLogs] = useState<LogEntry[]>([
@@ -320,36 +320,28 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [config, setConfig] = useState<DashboardConfig>(DEFAULT_CONFIG);
   const [agentMessages, setAgentMessages] = useState<AgentMessage[]>(genAgentConversation());
   const [sidebarOpen, setSidebarOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
-  const [lastSync, setLastSync] = useState<number>(Date.now());
+  const [lastSync, setLastSync] = useState<number>(() => Date.now());
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
-  const [preferences, setPreferencesState] = useState<AppPreferences>({ density: "comfortable", onboarded: false });
-  const [agentHealth, setAgentHealth] = useState<{ a: AgentHealth; b: AgentHealth }>({
-    a: { latencyMs: 180, inferenceMs: 1400, successCount: 0, failCount: 0, queueDepth: 0, uptimePct: 99.8 },
-    b: { latencyMs: 0, inferenceMs: 0, successCount: 0, failCount: 0, queueDepth: 0, uptimePct: 99.9 },
+  const [preferences, setPreferencesState] = useState<AppPreferences>(() => {
+    if (typeof window === "undefined") return { density: "comfortable", onboarded: false };
+    try {
+      const stored = window.localStorage.getItem("a2z-prefs");
+      if (!stored) return { density: "comfortable", onboarded: false };
+      return { density: "comfortable", onboarded: false, ...JSON.parse(stored) as Partial<AppPreferences> };
+    } catch {
+      return { density: "comfortable", onboarded: false };
+    }
   });
+  const agentHealth: { a: AgentHealth; b: AgentHealth } = {
+    a: { latencyMs: 180, inferenceMs: 1400, successCount: 0, failCount: 0, queueDepth: 0, uptimePct: 99.8 },
+    b: { latencyMs: 0, inferenceMs: 0, successCount: 0, failCount: 0, queueDepth: approvalQueue.length, uptimePct: 99.9 },
+  };
 
   // ─── Agent WebSocket (real data) ──────────────────────────────
   const ws = useAgentWebSocket();
   const usingReal = ws.status === "connected";
 
   const logCountRef = useRef(0);
-
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem("a2z-prefs");
-      if (stored) {
-        const parsed = JSON.parse(stored) as Partial<AppPreferences>;
-        setPreferencesState((prev) => ({ ...prev, ...parsed }));
-      }
-    } catch { /* ignore */ }
-  }, []);
-
-  useEffect(() => {
-    setAgentHealth((h) => ({
-      ...h,
-      b: { ...h.b, queueDepth: approvalQueue.length },
-    }));
-  }, [approvalQueue.length]);
 
   const addNotification = useCallback((type: NotificationType, title: string, body: string, link?: string) => {
     setNotifications((prev) => [
@@ -415,7 +407,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
         addNotification("failure", "Analysis Rejected", `${projectName} was rejected. Reason: ${data.reason}`);
       }
       
-    } catch (err) {
+    } catch {
       addLog("WARN", `Backend unavailable. Using mock simulation for ${projectName}.`);
       // Mock Fallback
       setTimeout(() => {
@@ -426,15 +418,12 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   }, [addLog, addNotification]);
 
   // ─── Real WS data overrides mock when connected ────────────────────────────
-  useEffect(() => {
-    if (!usingReal) return;
-    setAgentMessages(ws.agentLogs.map(mapLogToAgentMessage).slice(-50) as AgentMessage[]);
-  }, [ws.agentLogs, usingReal]);
-
-  useEffect(() => {
-    if (!usingReal) return;
-    setTransactions(ws.transactions.map(mapRawTxToTransaction) as Transaction[]);
-  }, [ws.transactions, usingReal]);
+  const visibleAgentMessages = usingReal
+    ? ws.agentLogs.map(mapLogToAgentMessage).slice(-50) as AgentMessage[]
+    : agentMessages;
+  const visibleTransactions = usingReal
+    ? ws.transactions.map(mapRawTxToTransaction) as Transaction[]
+    : transactions;
 
   // ─── Real Backend Polling & Live Simulation ──────────────────────────────────────
   useEffect(() => {
@@ -450,7 +439,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
           // Only update if there are new transactions (simplified check by length)
           setTransactions((prev) => mappedTxs.length > prev.length ? mappedTxs.slice(0, 50) : prev);
         }
-      } catch (e) {
+      } catch {
         // Fallback to simulation if backend is down
         const roll = Math.random();
 
@@ -480,11 +469,11 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   }, [isPaused, usingReal, addLog, addNotification]);
 
   const kpiMetrics: KpiMetrics = {
-    totalTvlAnalyzed: 42_800_000 + transactions.length * 180000,
-    successRate: Math.round((transactions.filter((t) => t.status === "success").length / Math.max(transactions.length, 1)) * 100),
-    totalTransactions: transactions.length,
-    gasSavedUsd: +(transactions.filter((t) => t.status === "success").length * 0.08).toFixed(2),
-    projectsScanned: 1247 + transactions.length * 3,
+    totalTvlAnalyzed: 42_800_000 + visibleTransactions.length * 180000,
+    successRate: Math.round((visibleTransactions.filter((t) => t.status === "success").length / Math.max(visibleTransactions.length, 1)) * 100),
+    totalTransactions: visibleTransactions.length,
+    gasSavedUsd: +(visibleTransactions.filter((t) => t.status === "success").length * 0.08).toFixed(2),
+    projectsScanned: 1247 + visibleTransactions.length * 3,
     activeAlerts: approvalQueue.length,
   };
 
@@ -567,11 +556,11 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     <DashboardContext.Provider
       value={{
         agentAStatus, agentBStatus, isPaused, setIsPaused,
-        transactions, approvalQueue, logs, vectorMemory,
+        transactions: visibleTransactions, approvalQueue, logs, vectorMemory,
         kpiMetrics, gasHistory, tvlHistory, successHistory,
         config, setConfig,
         handleApprove, handleReject, handleBlacklist, handleClearCache,
-        agentMessages, sidebarOpen, setSidebarOpen,
+        agentMessages: visibleAgentMessages, sidebarOpen, setSidebarOpen,
         lastSync, wsStatus: ws.status, notifications, unreadCount: notifications.filter((n) => !n.read).length,
         addNotification, markNotificationsRead, clearNotifications,
         agentHealth, preferences, setPreferences, analyzeTarget,

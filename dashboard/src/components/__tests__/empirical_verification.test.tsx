@@ -143,7 +143,7 @@ describe('Empirical Verification: Theme System & useTheme', () => {
 describe('Empirical Verification: Chart Colors & useChartColors', () => {
   it('should react dynamically to resolvedTheme changes', () => {
     prefersDark = false;
-    const themeHook = renderHook(() => useTheme());
+    renderHook(() => useTheme());
     const colorsHook = renderHook(() => useChartColors());
 
 
@@ -167,7 +167,7 @@ describe('Empirical Verification: Chart Colors & useChartColors', () => {
     document.documentElement.style.setProperty('--color-chart-primary', '#111111');
     document.documentElement.style.setProperty('--color-chart-secondary', '#222222');
 
-    const themeHook = renderHook(() => useTheme());
+    renderHook(() => useTheme());
     const colorsHook = renderHook(() => useChartColors());
 
 
@@ -182,7 +182,7 @@ describe('Empirical Verification: Chart Colors & useChartColors', () => {
 });
 
 describe('Empirical Verification: Keyboard Shortcuts & useKeyboardShortcut', () => {
-  let callback: any;
+  let callback: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     callback = vi.fn();

@@ -314,6 +314,20 @@ export default function RegisterPage() {
                 {errors.walletAddress}
               </p>
             )}
+            <button
+              type="button"
+              onClick={() => setWalletModalOpen(true)}
+              className="mt-2 w-full py-2.5 rounded-xl text-sm font-medium border transition-all hover:opacity-80 focus-ring flex items-center justify-center gap-2"
+              style={{
+                borderColor: "var(--color-border-default)",
+                color: "var(--color-body)",
+                background: "var(--color-neutral-secondary-medium)",
+              }}
+              aria-label="Connect wallet to registration"
+            >
+              <Wallet className="w-4 h-4" aria-hidden="true" />
+              Connect Wallet
+            </button>
           </div>
 
           {/* Submit */}
@@ -362,6 +376,12 @@ export default function RegisterPage() {
           </Link>
         </p>
       </div>
+      <WalletConnectModal
+        open={walletModalOpen}
+        onClose={() => setWalletModalOpen(false)}
+        onConnected={(session) => setWalletAddress(session.address)}
+        onContinue={() => router.push("/dashboard")}
+      />
     </motion.div>
 
     <WalletConnectModal

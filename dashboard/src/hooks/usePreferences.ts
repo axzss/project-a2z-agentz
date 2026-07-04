@@ -1,35 +1,29 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 export type Density = 'default' | 'compact';
 
 export function usePreferences() {
-  const [density, setDensityState] = useState<Density>('default');
-  const [mounted, setMounted] = useState(false);
+  const [density, setDensityState] = useState<Density>(() => {
+    if (typeof window === 'undefined') return 'default';
+    const stored = window.localStorage.getItem('a2z-density') as Density | null;
+    return stored === 'default' || stored === 'compact' ? stored : 'default';
+  });
 
   useEffect(() => {
-    const stored = localStorage.getItem('a2z-density') as Density | null;
-    const initialDensity: Density = stored === 'default' || stored === 'compact' ? stored : 'default';
-    
-    setMounted(true);
-    setDensityState(initialDensity);
-  }, []);
-
-  // Update data-density attribute on document element dynamically
-  useEffect(() => {
-    if (!mounted) return;
     document.documentElement.setAttribute('data-density', density);
-  }, [density, mounted]);
+  }, [density]);
 
   const setDensity = useCallback((d: Density) => {
     setDensityState(d);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('a2z-density', d);
+      window.localStorage.setItem('a2z-density', d);
+      document.documentElement.setAttribute('data-density', d);
     }
   }, []);
 
   return {
-    density: mounted ? density : 'default',
+    density,
     setDensity,
   };
 }

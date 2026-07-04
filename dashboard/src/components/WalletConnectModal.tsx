@@ -19,13 +19,34 @@ function statusLabel(status: WalletStatus) {
   return "Install required";
 }
 
-function statusClass(status: WalletStatus) {
-  if (status === "detected") return "text-[var(--color-fg-success)] bg-[var(--color-bg-success-subtle)] border-[var(--color-border-success)]";
-  if (status === "open_wallet_browser") return "text-[var(--color-fg-info)] bg-[var(--color-bg-info-subtle)] border-[var(--color-border-info)]";
-  return "text-[var(--color-fg-warning)] bg-[var(--color-bg-warning-subtle)] border-[var(--color-border-warning)]";
+function statusStyle(status: WalletStatus) {
+  if (status === "detected") {
+    return {
+      color: "var(--color-fg-success)",
+      borderColor: "var(--color-fg-success)",
+      background: "color-mix(in srgb, var(--color-fg-success) 12%, transparent)",
+    };
+  }
+  if (status === "open_wallet_browser") {
+    return {
+      color: "var(--color-fg-info)",
+      borderColor: "var(--color-fg-info)",
+      background: "color-mix(in srgb, var(--color-fg-info) 12%, transparent)",
+    };
+  }
+  return {
+    color: "var(--color-fg-warning)",
+    borderColor: "var(--color-fg-warning)",
+    background: "color-mix(in srgb, var(--color-fg-warning) 12%, transparent)",
+  };
 }
 
-export default function WalletConnectModal({ open, onClose, onConnected, onContinue }: WalletConnectModalProps) {
+export default function WalletConnectModal({
+  open,
+  onClose,
+  onConnected,
+  onContinue,
+}: WalletConnectModalProps) {
   const wallet = useWalletConnect();
 
   useEffect(() => {
@@ -40,33 +61,52 @@ export default function WalletConnectModal({ open, onClose, onConnected, onConti
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4 backdrop-blur-md transition-all" role="presentation">
+    <div
+      className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-4 backdrop-blur-sm"
+      role="presentation"
+    >
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="wallet-connect-title"
-        className="w-full max-w-md rounded-2xl p-6 shadow-2xl transition-all"
+        className="w-full max-w-md rounded-2xl border p-5 shadow-2xl"
         style={{
-          background: "color-mix(in srgb, var(--color-surface) 90%, transparent)",
-          border: "1px solid var(--color-border-default)",
-          backdropFilter: "blur(20px)",
+          background: "var(--color-surface)",
+          borderColor: "var(--color-border-default)",
         }}
       >
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl" style={{ background: "linear-gradient(135deg, var(--color-brand), var(--color-accent-purple))" }}>
+            <div
+              className="flex h-10 w-10 items-center justify-center rounded-xl"
+              style={{
+                background:
+                  "linear-gradient(135deg, var(--color-brand), var(--color-accent-purple))",
+              }}
+            >
               <Wallet className="h-5 w-5" aria-hidden="true" style={{ color: "#ffffff" }} />
             </div>
             <div>
-              <h2 id="wallet-connect-title" className="text-lg font-bold" style={{ color: "var(--color-heading)" }}>Connect Wallet</h2>
-              <p className="mt-1 text-sm" style={{ color: "var(--color-body-subtle)" }}>Choose an EVM wallet for Base Network.</p>
+              <h2
+                id="wallet-connect-title"
+                className="text-lg font-bold"
+                style={{ color: "var(--color-heading)" }}
+              >
+                Connect Wallet
+              </h2>
+              <p className="mt-1 text-sm" style={{ color: "var(--color-body-subtle)" }}>
+                Choose an active EVM wallet for Base Network.
+              </p>
             </div>
           </div>
           <button
             onClick={onClose}
             aria-label="Close wallet connect modal"
-            className="rounded-lg p-2 focus-ring transition-all hover:bg-black/5 dark:hover:bg-white/5"
-            style={{ color: "var(--color-body-subtle)" }}
+            className="rounded-lg border p-2 focus-ring"
+            style={{
+              borderColor: "var(--color-border-default)",
+              color: "var(--color-body)",
+            }}
           >
             <X className="h-4 w-4" />
           </button>
@@ -82,54 +122,92 @@ export default function WalletConnectModal({ open, onClose, onConnected, onConti
               }}
               disabled={wallet.state === "connecting"}
               aria-label={`Connect ${option.name}`}
-              className="flex w-full items-center justify-between gap-3 rounded-xl px-4 py-3 text-left transition-all hover:border-[var(--color-border-brand)] hover:shadow-md disabled:opacity-60 focus-ring"
+              className="flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-all hover:opacity-85 disabled:opacity-60 focus-ring"
               style={{
-                border: "1px solid var(--color-border-default)",
-                background: "color-mix(in srgb, var(--color-neutral-secondary-soft) 40%, transparent)",
+                borderColor: "var(--color-border-default)",
+                background: "var(--color-neutral-secondary-medium)",
               }}
             >
-              <div className="flex-1 min-w-0 pr-3">
-                <span className="block text-sm font-semibold truncate" style={{ color: "var(--color-heading)" }}>{option.name}</span>
-                <span className="block text-xs mt-0.5" style={{ color: "var(--color-body-subtle)", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow: "hidden" }}>{option.description}</span>
-              </div>
-              <span className={`shrink-0 whitespace-nowrap rounded-full border px-2.5 py-1 text-[10px] font-semibold ${statusClass(option.status)}`}>{statusLabel(option.status)}</span>
+              <span>
+                <span
+                  className="block text-sm font-semibold"
+                  style={{ color: "var(--color-heading)" }}
+                >
+                  {option.name}
+                </span>
+                <span className="block text-xs" style={{ color: "var(--color-body-subtle)" }}>
+                  {option.description}
+                </span>
+              </span>
+              <span
+                className="rounded-full border px-2 py-1 text-[10px] font-semibold"
+                style={statusStyle(option.status)}
+              >
+                {statusLabel(option.status)}
+              </span>
             </button>
           ))}
         </div>
 
         {wallet.state === "connecting" && (
-          <p className="mt-4 flex items-center gap-2 text-sm" style={{ color: "var(--color-body-subtle)" }}>
-            <Loader2 className="h-4 w-4 animate-spin text-[var(--color-fg-brand)]" aria-hidden="true" /> Waiting for wallet approval...
+          <p className="mt-3 flex items-center gap-2 text-sm" style={{ color: "var(--color-body-subtle)" }}>
+            <Loader2 className="h-4 w-4 animate-spin text-[var(--color-fg-brand)]" aria-hidden="true" />
+            Waiting for wallet approval...
           </p>
         )}
 
         {wallet.error && (
-          <p role="alert" className="mt-4 rounded-xl p-3 text-sm" style={{ color: "var(--color-fg-danger)", border: "1px solid rgba(239, 68, 68, 0.15)", background: "rgba(239, 68, 68, 0.05)" }}>
+          <p
+            role="alert"
+            className="mt-3 rounded-xl border p-3 text-sm"
+            style={{
+              color: "var(--color-fg-danger)",
+              borderColor: "var(--color-fg-danger)",
+              background: "color-mix(in srgb, var(--color-fg-danger) 12%, transparent)",
+            }}
+          >
             {wallet.error}
           </p>
         )}
 
-        <div className="mt-4 rounded-xl p-3 text-xs leading-relaxed" style={{ color: "var(--color-body-subtle)", border: "1px solid var(--color-border-default)", background: "color-mix(in srgb, var(--color-neutral-secondary-soft) 50%, transparent)" }}>
-          Wallet login currently creates a frontend-only session until backend SIWE is implemented.
+        <div
+          className="mt-4 rounded-xl border p-3 text-xs"
+          style={{
+            color: "var(--color-fg-info)",
+            borderColor: "var(--color-border-default)",
+            background: "color-mix(in srgb, var(--color-fg-info) 10%, transparent)",
+          }}
+        >
+          Wallet login currently creates a frontend-only session until backend SIWE is
+          implemented.
         </div>
 
         {wallet.session && (
-          <div className="mt-4 rounded-xl p-4" style={{ color: "var(--color-fg-warning)", border: "1px solid rgba(245, 158, 11, 0.15)", background: "rgba(245, 158, 11, 0.05)" }}>
+          <div
+            className="mt-4 rounded-xl border p-4"
+            style={{
+              color: "var(--color-fg-warning)",
+              borderColor: "var(--color-fg-warning)",
+              background: "color-mix(in srgb, var(--color-fg-warning) 12%, transparent)",
+            }}
+          >
             <div className="flex items-start gap-2">
-              <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+              <ShieldAlert className="mt-0.5 h-4 w-4" aria-hidden="true" />
               <div>
-                <h3 className="font-semibold text-sm">Wallet login is frontend-only</h3>
-                <p className="mt-1 text-xs leading-relaxed text-[var(--color-fg-warning)]/80">
-                  Connected as <span className="font-mono font-bold">{wallet.formattedAddress}</span>. Backend SIWE is not ready yet, so protected backend auth still requires email/password.
+                <h3 className="font-semibold">Wallet login is frontend-only</h3>
+                <p className="mt-1 text-xs leading-relaxed">
+                  Connected as <span className="font-mono">{wallet.formattedAddress}</span>.
+                  Backend SIWE is not ready yet, so protected backend auth still requires
+                  email/password.
                 </p>
               </div>
             </div>
             <button
               onClick={onContinue}
-              className="mt-4 w-full rounded-xl py-3 text-sm font-bold transition-all hover:brightness-110 active:scale-[0.99] focus-ring"
+              className="mt-4 w-full rounded-xl px-4 py-3 text-sm font-semibold focus-ring"
               style={{
-                background: "linear-gradient(135deg, #ffe2a0, #ffc65e)",
-                color: "#16100a",
+                background: "var(--color-fg-warning)",
+                color: "var(--color-neutral-primary)",
               }}
             >
               Continue to dashboard

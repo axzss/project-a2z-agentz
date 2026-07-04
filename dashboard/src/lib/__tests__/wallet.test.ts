@@ -27,14 +27,25 @@ describe("wallet lib", () => {
   });
 
   it("formats EVM addresses", () => {
-    expect(formatAddress("0x1234567890abcdef1234567890abcdef12345678")).toBe("0x1234...5678");
+    expect(formatAddress("0x1234567890abcdef1234567890abcdef12345678")).toBe(
+      "0x1234...5678"
+    );
     expect(formatAddress("")).toBe("Not connected");
   });
 
   it("returns install hints when no provider exists", () => {
     const wallets = detectWalletProviders();
-    expect(wallets.map((w) => w.id)).toEqual(["metamask", "coinbase", "rabby", "injected"]);
-    expect(wallets.every((w) => w.status === "install_required" || w.status === "open_wallet_browser")).toBe(true);
+    expect(wallets.map((w) => w.id)).toEqual([
+      "metamask",
+      "coinbase",
+      "rabby",
+      "injected",
+    ]);
+    expect(
+      wallets.every(
+        (w) => w.status === "install_required" || w.status === "open_wallet_browser"
+      )
+    ).toBe(true);
   });
 
   it("detects multiple injected providers", () => {
@@ -69,7 +80,9 @@ describe("wallet lib", () => {
 
     expect(localStorage.getItem(WALLET_SESSION_KEY)).toContain("MetaMask");
     expect(document.cookie).toContain(`${WALLET_SESSION_COOKIE}=1`);
-    expect(getWalletSession()?.address).toBe("0x1234567890abcdef1234567890abcdef12345678");
+    expect(getWalletSession()?.address).toBe(
+      "0x1234567890abcdef1234567890abcdef12345678"
+    );
 
     clearWalletSession();
     expect(getWalletSession()).toBeNull();
