@@ -274,6 +274,48 @@ def run_scout_cycle() -> None:
     logger.info("Agent A pipeline done | %s", json.dumps(summary))
 
 
+def scrape_projects(source: str = "scout", limit: int = 2) -> list[ScoutProject]:
+    if source == "mock":
+        return [
+            ScoutProject(
+                project_name="Aerodrome",
+                description="vol_24h=1200000",
+                target_address="0x940181a94A35A4569E4529A3CDfB74e38FD98631",
+                source="mock-scout"
+            ),
+            ScoutProject(
+                project_name="FriendTech",
+                description="vol_24h=450000",
+                target_address="0xCF205808Ed36593aa40a44F10c1f55a1873319c7",
+                source="mock-scout"
+            )
+        ][:limit]
+
+    dex_tokens = fetch_trending_tokens_dexscreener(limit=limit)
+    bs_tokens = fetch_new_contracts_basescan(limit=limit)
+    all_tokens = dex_tokens + bs_tokens
+
+    out: list[ScoutProject] = []
+    for token in all_tokens[:limit]:
+        token_name = token.get("token_name")
+        contract = token.get("contract_address")
+        if not token_name:
+            continue
+        checksum = normalize_address(contract) if contract else None
+        if contract and checksum is None:
+            continue
+        out.append(ScoutProject(
+            project_name=token_name,
+            description=f"vol_24h={token.get('volume_24h')}",
+            target_address=checksum,
+            volume_24h=token.get("volume_24h"),
+            price_change_24h=token.get("price_change_24h"),
+            market_cap=token.get("market_cap"),
+            source="scout"
+        ))
+    return out
+
+
 def main() -> None:
     run_scout_cycle()
 

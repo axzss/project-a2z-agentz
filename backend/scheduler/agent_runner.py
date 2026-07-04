@@ -10,9 +10,9 @@ import database
 
 # If you have an agent_a.py, import it here
 try:
-    import agent_a_scraper
+    import agent_a
 except ImportError:
-    agent_a_scraper = None
+    agent_a = None
 try:
     import agent_b
 except ImportError:
@@ -27,13 +27,13 @@ scheduler = BackgroundScheduler()
 def run_agent_a():
     """Wrapper to run Agent A logic (Scraping & Sentiment Analysis)"""
     logger.info("Triggering Agent A (Scout)...")
-    if not agent_a_scraper:
-        logger.warning("agent_a_scraper not found")
+    if not agent_a:
+        logger.warning("agent_a not found")
         return
         
     try:
         source = os.getenv("AGENT_A_SOURCE", "mock")
-        projects = agent_a_scraper.scrape_projects(source=source, limit=2)
+        projects = agent_a.scrape_projects(source=source, limit=2)
         logger.info(f"Agent A scraped {len(projects)} projects.")
         
         for p in projects:

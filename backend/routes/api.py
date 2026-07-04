@@ -9,7 +9,7 @@ from starlette.requests import Request
 # Add root directory to sys.path so we can import the existing database module
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 import database
-from agent_a_scraper import normalize_address
+from agent_a import normalize_address
 from agent_a_chroma import check_semantic_similarity
 from agent_a_inference import run_ai_inference, DEFAULT_MODEL
 from agent_b import _usd_to_wei, _idempotency_key, AUTONOMOUS_CAP_USD, _format_with_deepseek

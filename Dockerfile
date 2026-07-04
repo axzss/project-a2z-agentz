@@ -6,11 +6,9 @@ WORKDIR /app
 
 # Copy requirement files first for caching
 COPY requirements.txt .
-COPY backend/requirements.txt ./backend_reqs.txt
 
 # Install dependencies (Python 3.11 has pre-compiled wheels for most packages)
 RUN pip install --no-cache-dir -r requirements.txt
-RUN pip install --no-cache-dir -r backend_reqs.txt
 
 # Copy the rest of the app
 COPY . .

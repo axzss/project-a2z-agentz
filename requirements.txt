@@ -130,3 +130,15 @@ webencodings==0.5.1
 websocket-client==1.9.0
 websockets==15.0.1
 yarl==1.24.2
+starlette
+uvicorn
+psycopg2-binary
+APScheduler
+python-dotenv
+bcrypt
+PyJWT
+apify-client
+httpx
+chromadb
+onnxruntime
+tokenizers
