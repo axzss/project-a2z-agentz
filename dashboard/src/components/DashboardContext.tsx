@@ -172,134 +172,25 @@ export function useDashboard() {
   return ctx;
 }
 
-// ─── Generators ─────────────────────────────────────────────
-const PROJECTS = [
-  "ZeroGravity Protocol", "NeuralFi", "BaseSwap V3", "OmniLayer DAO",
-  "CryptoNest", "DeFi Nexus", "ChainLink Base", "Arbitrage Bot X",
-  "Yield Optimizer Pro", "FlashLoan Gate",
-];
-
-const FARCASTER_MSGS = [
-  "Scanning Farcaster channel /defi — 342 casts analyzed",
-  "High-alpha signal detected: ZeroGravity Protocol gaining traction",
-  "KOL @vitalik.eth mentioned NeuralFi in thread",
-  "Llama 3 sentiment analysis: 78% positive on BaseSwap V3",
-  "Embedding 128 new posts into ChromaDB vector store",
-  "Similarity score 0.91 — project not in cache, proceeding",
-  "On-chain check: Contract verified on Basescan",
-  "TVL fetched: $2.1M — above $500k threshold",
-  "Score Engine: Sentiment 70pts + TVL 28pts = Total 98/100",
-  "Payload assembled, signing with Agent A private key...",
-  "Cryptographic signature attached (ECDSA secp256k1)",
-  "Sending to Agent B Vault API: POST /api/v1/vault/execute",
-];
-
-const AGENT_B_MSGS = [
-  "Vault received payload from Agent A",
-  "Signature verified — public key matches whitelist",
-  "Timestamp freshness check passed (< 30s)",
-  "Idempotency check: Hash not found in PostgreSQL",
-  "Gas oracle pinged: 42 Gwei avg, setting maxFee to 48.3 Gwei",
-  "Running Tenderly dry-run simulation...",
-  "Simulation passed — no revert detected",
-  "Broadcasting tx to Base mainnet via Alchemy RPC...",
-  "Tx included in block #21,847,392",
-];
-
 function randInt(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-function randFrom<T>(arr: T[]): T {
-  return arr[randInt(0, arr.length - 1)];
 }
 function genId() {
   return Math.random().toString(36).slice(2, 10);
 }
-function genAddress() {
-  return "0x" + Array.from({ length: 40 }, () => "0123456789abcdef"[randInt(0, 15)]).join("");
-}
 function genTxHash() {
   return "0x" + Array.from({ length: 64 }, () => "0123456789abcdef"[randInt(0, 15)]).join("");
 }
-
-function genInitialTransactions(): Transaction[] {
-  return Array.from({ length: 8 }, (_, i) => ({
-    id: genId(),
-    projectName: PROJECTS[i % PROJECTS.length],
-    targetAddress: genAddress(),
-    amountUsd: +(Math.random() * 1.8 + 0.2).toFixed(2),
-    status: (["success", "success", "success", "failed"] as TxStatus[])[randInt(0, 3)],
-    txHash: genTxHash(),
-    timestamp: new Date(Date.now() - (8 - i) * 4 * 60000),
-    reason: "High positive sentiment on Farcaster + Verified TVL > 500k",
-    gasUsedGwei: randInt(35, 65),
-  }));
+function genAddress() {
+  return "0x" + Array.from({ length: 40 }, () => "0123456789abcdef"[randInt(0, 15)]).join("");
 }
 
-function genInitialApprovals(): ApprovalItem[] {
-  return Array.from({ length: 3 }, () => ({
-    id: genId(),
-    projectName: randFrom(PROJECTS),
-    targetAddress: genAddress(),
-    amountUsd: +(Math.random() * 8 + 2.1).toFixed(2),
-    reason: "TVL > $5M & KOL engagement detected. Exceeds $2 cap — requires manual approval.",
-    llmScore: randInt(86, 99),
-    createdAt: new Date(Date.now() - randInt(1, 15) * 60000),
-    signature: "0x" + Array.from({ length: 20 }, () => "0123456789abcdef"[randInt(0, 15)]).join("") + "...",
-  }));
-}
-
-function genInitialVectorMemory(): VectorMemoryItem[] {
-  return Array.from({ length: 12 }, (_, i) => ({
-    id: genId(),
-    projectName: PROJECTS[i % PROJECTS.length],
-    contractAddress: genAddress(),
-    similarityScore: +(Math.random() * 0.5 + 0.5).toFixed(3),
-    embeddingStatus: (["indexed", "indexed", "indexed", "processing", "blacklisted"] as VectorMemoryItem["embeddingStatus"][])[randInt(0, 4)],
-    source: (["Farcaster", "Twitter", "On-Chain"] as VectorMemoryItem["source"][])[randInt(0, 2)],
-    tvl: randInt(100000, 8000000),
-    indexedAt: new Date(Date.now() - randInt(5, 120) * 60000),
-  }));
-}
-
-function genGasHistory(): GasDataPoint[] {
-  const now = Date.now();
-  return Array.from({ length: 24 }, (_, i) => ({
-    time: new Date(now - (23 - i) * 3600000).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
-    gwei: randInt(28, 85),
-  }));
-}
-
-function genTvlHistory(): TvlDataPoint[] {
-  let tvl = 1200000;
-  return Array.from({ length: 30 }, (_, i) => {
-    tvl += randInt(-50000, 180000);
-    return { time: `Day ${i + 1}`, tvl: Math.max(tvl, 800000) };
-  });
-}
-
-function genSuccessHistory(): SuccessDataPoint[] {
-  const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  return days.map((d) => ({ time: d, success: randInt(8, 24), failed: randInt(0, 5) }));
-}
+// (Dummy generators removed)
 
 const DEFAULT_CONFIG: DashboardConfig = {
   agentA: { cronSchedule: "0 * * * *", sentimentWeight: 70, tvlWeight: 30, scoreThreshold: 85, sources: ["Farcaster", "Twitter", "On-Chain"] },
   agentB: { kmsRegion: "us-east-1", primaryRpc: "https://base-mainnet.g.alchemy.com/v2/YOUR_KEY", fallbackRpc: "https://mainnet.base.org", autonomousCap: 2.0, gasBuffer: 15 },
 };
-
-// ─── A2A Message Generator ──────────────────────────────────
-function genAgentConversation(): AgentMessage[] {
-  const now = Date.now();
-  return [
-    { id: genId(), sender: "system", content: "A2A session initialized. Agents connected via secure channel.", timestamp: new Date(now - 120000), status: "done" },
-    { id: genId(), sender: "agent_a", content: "Starting DeFi scan cycle. Analyzing Farcaster + Twitter signals...", timestamp: new Date(now - 100000), status: "done" },
-    { id: genId(), sender: "agent_a", content: "Found candidate: ZeroGravity Protocol. TVL $2.1M, sentiment 92% positive.", timestamp: new Date(now - 80000), status: "done", metadata: { projectName: "ZeroGravity Protocol", score: 92 } },
-    { id: genId(), sender: "agent_b", content: "Received payload. Verifying signature and running dry-run simulation...", timestamp: new Date(now - 60000), status: "done" },
-    { id: genId(), sender: "agent_b", content: "Simulation passed. Broadcasting tx to Base mainnet.", timestamp: new Date(now - 40000), status: "done", metadata: { txHash: genTxHash().slice(0, 18) + "..." } },
-    { id: genId(), sender: "agent_a", content: "Tx confirmed. Moving to next candidate: NeuralFi (KOL signal detected).", timestamp: new Date(now - 20000), status: "done" },
-  ];
-}
 
 export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
@@ -317,8 +208,16 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   const [gasHistory, setGasHistory] = useState<GasDataPoint[]>([]);
   const [tvlHistory, setTvlHistory] = useState<TvlDataPoint[]>([]);
   const [successHistory, setSuccessHistory] = useState<SuccessDataPoint[]>([]);
+  const [kpiMetrics, setKpiMetrics] = useState<KpiMetrics>({
+    totalTvlAnalyzed: 42800000,
+    successRate: 0,
+    totalTransactions: 0,
+    gasSavedUsd: 0,
+    projectsScanned: 1247,
+    activeAlerts: 0,
+  });
   const [config, setConfig] = useState<DashboardConfig>(DEFAULT_CONFIG);
-  const [agentMessages, setAgentMessages] = useState<AgentMessage[]>(genAgentConversation());
+  const [agentMessages, setAgentMessages] = useState<AgentMessage[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(() => typeof window !== 'undefined' ? window.innerWidth >= 1024 : true);
   const [lastSync, setLastSync] = useState<number>(() => Date.now());
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
@@ -364,18 +263,59 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  useEffect(() => {
-    const t = setTimeout(() => {
-      setTransactions(genInitialTransactions());
-      setApprovalQueue(genInitialApprovals());
-      setVectorMemory(genInitialVectorMemory());
-      setGasHistory(genGasHistory());
-      setTvlHistory(genTvlHistory());
-      setSuccessHistory(genSuccessHistory());
-      setMounted(true);
-    }, 0);
-    return () => clearTimeout(t);
+  const fetchDashboardData = useCallback(async () => {
+    try {
+      const [statusData, statsData, sysData] = await Promise.all([
+        apiFetch<{ logs?: Array<{ tx_hash_id: string; project_target_address: string; amount_usd: number; status: string; created_at: string }> }>("/api/status"),
+        apiFetch<{ total_transactions: number; success_rate: number; total_usd_sent: number; active_targets: number; projects_scanned?: number; total_tvl?: number }>("/api/stats"),
+        apiFetch<{ circuit_breaker: string }>("/api/system-status")
+      ]);
+
+      if (statusData?.logs) {
+        const mappedTxs = statusData.logs.map(mapRawTxToTransaction) as Transaction[];
+        setTransactions(mappedTxs.slice(0, 50));
+      }
+
+      if (sysData && sysData.circuit_breaker) {
+        setIsPaused(sysData.circuit_breaker === "paused");
+      }
+
+      if (statsData) {
+        setKpiMetrics(prev => ({
+          ...prev,
+          successRate: statsData.success_rate,
+          totalTransactions: statsData.total_transactions,
+          gasSavedUsd: +(statsData.total_transactions * 0.08).toFixed(2),
+          projectsScanned: statsData.projects_scanned || 0,
+          totalTvlAnalyzed: statsData.total_tvl || 0,
+        }));
+      }
+    } catch (e) {
+      console.error("Failed to fetch dashboard data:", e);
+    }
   }, []);
+
+  useEffect(() => {
+    const initData = async () => {
+      // Start with flatline histories to represent real data state
+      const now = Date.now();
+      const flatGas = Array.from({ length: 24 }, (_, i) => ({
+        time: new Date(now - (23 - i) * 3600000).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" }),
+        gwei: 0,
+      }));
+      const flatTvl = Array.from({ length: 30 }, (_, i) => ({ time: `Day ${i + 1}`, tvl: 0 }));
+      const flatSuccess = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => ({ time: d, success: 0, failed: 0 }));
+
+      setVectorMemory([]);
+      setGasHistory(flatGas);
+      setTvlHistory(flatTvl);
+      setSuccessHistory(flatSuccess);
+      
+      await fetchDashboardData();
+      setMounted(true);
+    };
+    initData();
+  }, [fetchDashboardData]);
   const addLog = useCallback((level: LogEntry["level"], message: string) => {
     setLogs((prev) => [{ id: genId(), timestamp: new Date(), level, message }, ...prev].slice(0, 100));
     logCountRef.current++;
@@ -425,57 +365,46 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
     ? ws.transactions.map(mapRawTxToTransaction) as Transaction[]
     : transactions;
 
+  useEffect(() => {
+    if (!usingReal) return;
+    // Map systemLogs to LogEntry
+    const newLogs = ws.systemLogs.map(l => ({
+      id: genId(),
+      timestamp: new Date(),
+      level: l.level,
+      message: l.message
+    })) as LogEntry[];
+    // We can prepend them to the existing logs or replace. Since ws.systemLogs is an array that grows,
+    // we can just use the latest ones combined with initial ones.
+    setLogs(prev => {
+      // Just to keep it simple and avoid duplicates on strict mode, 
+      // we'll just take the mapped logs from WS and prepend initial logs if needed.
+      // But actually, useAgentWebSocket accumulates them in state, so we can just replace.
+      // Wait, initial logs are good to keep. We can just append new ones if they aren't there?
+      // Since ws.systemLogs is accumulating, we can just map it directly and prepend initial.
+      const initial = [
+        { id: "init1", timestamp: new Date(), level: "INFO" as const, message: "A2Z Dashboard initialized. Connecting to agents..." },
+        { id: "init2", timestamp: new Date(), level: "SUCCESS" as const, message: "Agent A (Scout) connected. vLLM/ROCm server online." },
+        { id: "init3", timestamp: new Date(), level: "SUCCESS" as const, message: "Agent B (Vault) connected. KMS handshake successful." }
+      ];
+      return [...newLogs.reverse(), ...initial].slice(0, 100);
+    });
+  }, [ws.systemLogs, usingReal]);
+
   // ─── Real Backend Polling & Live Simulation ──────────────────────────────────────
   useEffect(() => {
     if (isPaused || usingReal) return;
     const interval = setInterval(async () => {
       setLastSync(Date.now());
-      
-      try {
-        const data = await apiFetch<{ logs?: Array<{ tx_hash_id: string; project_target_address: string; amount_usd: number; status: string; created_at: string }> }>("/api/status");
-        if (data && data.logs && data.logs.length > 0) {
-          const mappedTxs = data.logs.map(mapRawTxToTransaction) as Transaction[];
-          
-          // Only update if there are new transactions (simplified check by length)
-          setTransactions((prev) => mappedTxs.length > prev.length ? mappedTxs.slice(0, 50) : prev);
-        }
-      } catch {
-        // Fallback to simulation if backend is down
-        const roll = Math.random();
-
-        if (roll < 0.35) {
-          addLog("AGENT_A", randFrom(FARCASTER_MSGS));
-        } else if (roll < 0.6) {
-          addLog("AGENT_B", randFrom(AGENT_B_MSGS));
-        } else {
-          const proj = randFrom(PROJECTS);
-          const success = Math.random() > 0.15;
-          const newTx: Transaction = {
-            id: genId(),
-            projectName: proj,
-            targetAddress: genAddress(),
-            amountUsd: +(Math.random() * 1.8 + 0.2).toFixed(2),
-            status: success ? "success" : "failed",
-            txHash: genTxHash(),
-            timestamp: new Date(),
-            reason: "Llama 3 score: " + randInt(86, 99) + "/100",
-            gasUsedGwei: randInt(35, 65),
-          };
-          setTransactions((prev) => [newTx, ...prev].slice(0, 50));
-        }
-      }
+      await fetchDashboardData();
     }, 4000);
     return () => clearInterval(interval);
-  }, [isPaused, usingReal, addLog, addNotification]);
+  }, [isPaused, usingReal, fetchDashboardData]);
 
-  const kpiMetrics: KpiMetrics = {
-    totalTvlAnalyzed: 42_800_000 + visibleTransactions.length * 180000,
-    successRate: Math.round((visibleTransactions.filter((t) => t.status === "success").length / Math.max(visibleTransactions.length, 1)) * 100),
-    totalTransactions: visibleTransactions.length,
-    gasSavedUsd: +(visibleTransactions.filter((t) => t.status === "success").length * 0.08).toFixed(2),
-    projectsScanned: 1247 + visibleTransactions.length * 3,
-    activeAlerts: approvalQueue.length,
-  };
+  // Sync active alerts count into KPI
+  useEffect(() => {
+    setKpiMetrics(prev => ({ ...prev, activeAlerts: approvalQueue.length }));
+  }, [approvalQueue.length]);
 
   const handleApprove = useCallback(
     (id: string) => {

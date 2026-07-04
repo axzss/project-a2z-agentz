@@ -931,6 +931,32 @@ Sesi ini berfokus pada perbaikan responsivitas layout komponen header pada layar
 
 ---
 
+## Sesi 21 — 2026-06-21 | Fitur Demo/Guest Login & Perbaikan Infinite Redirect Loop
+
+### 📌 Ringkasan
+Sesi ini ditujukan untuk membangun fitur otentikasi "Guest / Demo" yang diperuntukkan bagi juri hackathon, memungkinkan akses penuh ke Dashboard tanpa perlu mendaftar atau menyambungkan dompet Web3 (*wallet*). Selain itu, kami juga menambal *bug* kritis (*infinite redirect loop*) yang terjadi akibat konflik antara respons 401 Unauthorized dari backend dengan proteksi rute di *frontend*.
+
+### ✅ Hal yang Berhasil Dikerjakan
+
+| Item | Detail |
+|------|--------|
+| **Fitur Guest Login (`loginAsGuest`)** | Menambahkan metode instan *login as guest* pada `AuthProvider.tsx` yang secara otomatis menginjeksi identitas *mock* (`judge@a2z.demo`) dan memasang *flag* `a2z-guest-session` ke `localStorage` agar sesi tetap bertahan (*persisted*) saat halaman di-*refresh*. |
+| **Penambahan UI Tombol Guest** | Menempatkan tombol "Continue as Demo / Guest" tepat di bawah tombol "Connect Web3 Wallet" di halaman `/login`. Tombol ini dibuat lebar (*full-width*), disematkan efek animasi sentuh (*group hover border & glow*), serta ikon `User` dari Lucide React agar sejajar dan konsisten dengan tata letak tombol dompet. |
+| **Fix Infinite Redirect Loop** | Memecahkan *bug* *refresh* berulang yang terjadi ketika sistem API (`apiFetch`) terus-menerus memaksa *redirect* ke `/login` setiap kali menerima status *401 Unauthorized* (karena sesi *Guest*/*Demo Wallet* tidak memiliki JWT riil). *Fix* dilakukan dengan mem- *bypass* aturan *redirect* tersebut jika *flag* sesi terdeteksi di sisi klien (`api.ts`). |
+| **Fix Missing Loading State** | Memperbaiki potensi *infinite loading* di dashboard akibat tidak terpanggilnya `setLoading(false)` saat proses inisialisasi sesi *Guest* berjalan di *Context API*. |
+
+### ✏️ File yang DIUBAH
+
+| File | Lokasi | Detail Perubahan |
+|------|--------|-----------------|
+| `AuthProvider.tsx` | `dashboard/src/components/` | Penambahan fungsi `loginAsGuest`, modifikasi logika `refresh` agar membaca *localStorage*, perbaikan stat `loading`, dan pembersihan *session* pada saat `logout`. |
+| `page.tsx` | `dashboard/src/app/(auth)/login/` | Implementasi UI baru untuk tombol *Guest/Demo* lengkap dengan ikon dan kelas animasi *Tailwind*. |
+| `api.ts` | `dashboard/src/lib/` | Modifikasi penanganan *error response* `401 Unauthorized` agar mengabaikan instruksi *redirect* apabila sesi *Guest* atau sesi *Demo Wallet* terdeteksi aktif di browser pengguna. |
+
+---
+
+---
+
 ## 🗂️ Struktur Direktori Akhir
 
 ```
@@ -978,3 +1004,182 @@ project-a2z-agentz/
 ```
 
 ---
+
+## Sesi 22 — 2026-06-21 | Real-time WebSockets & Port Synchronization
+
+### 📌 Ringkasan
+Fokus pada penyelesaian isu komunikasi antara frontend dan backend, memastikan fitur Circuit Breaker dan panel Agent Live Log dapat terhubung ke aliran data WebSocket secara sungguhan. Terjadi masalah *Connection Refused* yang bersumber dari ketidaksesuaian port API.
+
+### ✅ Hal yang Berhasil Dikerjakan
+
+| Item | Detail |
+|------|--------|
+| **Port Synchronization** | Memperbaiki port backend yang berjalan di `8000` (sebelumnya salah dikonfigurasi ke `8080` pada variabel environment `NEXT_PUBLIC_API_URL` di frontend dan `INTERNAL_API_URL` di `agent_runner.py`). |
+| **Circuit Breaker Frontend API** | Menyesuaikan pemanggilan API pada UI `CircuitBreaker.tsx` menggunakan utilitas `apiFetch` (menggantikan `fetch` standar) agar pengiriman request memiliki integrasi dengan API backend. |
+
+### ✏️ File yang DIUBAH
+
+| File | Lokasi | Detail Perubahan |
+|------|--------|-----------------|
+| `CircuitBreaker.tsx` | `dashboard/src/components/` | Migrasi `fetch` ke `apiFetch`. |
+| `.env.local` | `dashboard/` | Update `NEXT_PUBLIC_API_URL` ke `http://localhost:8000`. |
+| `agent_runner.py` | `backend/scheduler/` | Fix port tujuan request HTTP internal ke port `8000`. |
+
+**Status: ✅ WEBSOCKET & CIRCUIT BREAKER TERHUBUNG SECARA REAL-TIME.**
+
+---
+
+## Sesi 23 — 2026-06-21 | Fix Backend Mock Mode & Dashboard Timezone
+
+### 📌 Ringkasan
+Memperbaiki anomali WebSocket yang tidak mengirim log di mode simulasi (use_mock), serta mengatasi error schema constraint PostgreSQL pada backend. Selain itu, menyesuaikan pengaturan zona waktu untuk memastikan tabel *Recent Transactions* di dashboard frontend menampilkan waktu lokal secara akurat.
+
+### ✅ Hal yang Berhasil Dikerjakan
+
+| Item | Detail |
+|------|--------|
+| **Fix WebSocket Mock Data** | Menambahkan perintah `manager.broadcast` pada jalur `use_mock=True` di `api.py` sehingga UI dashboard bisa menerima log langsung secara simulasi. |
+| **Database Schema Alignment** | Mengubah *query* insert `target_addresses` dengan `status` menjadi `active` (huruf kecil) demi mematuhi CHECK constraint pada database, mencegah error 500 saat Agent berjalan. |
+| **Dashboard KPI Synchronization** | Menyuntikkan transaksi dan entitas address pura-pura ke dalam database ketika `use_mock=True` dipanggil, sehingga metrik *Projects Scanned* dan *TVL Analyzed* di panel dashboard ikut terinkrementasi secara real-time. |
+| **Timezone Parsing Fix** | Memperbaiki parser `timestamp` di `mappers.ts` yang tadinya mengasumsikan UTC menjadi *local time*, dengan menyematkan format UTC `Z` eksplisit. Kini waktu di tabel log sama persis dengan *Agent Communication* (Waktu lokal). |
+
+### ✏️ File yang DIUBAH
+
+| File | Lokasi | Detail Perubahan |
+|------|--------|-----------------|
+| `api.py` | `backend/routes/` | Perbaikan `use_mock` agar melakukan broadcast WebSocket & Insert DB dummy, serta sinkronisasi kapitalisasi teks `status`. |
+| `mappers.ts` | `dashboard/src/lib/` | Penyesuaian `new Date()` dengan suffix `Z` untuk konversi standar waktu UTC -> Lokal. |
+
+**Status: ✅ BUG MOCK DATA & ZONA WAKTU DASHBOARD TERATASI — SEMUA PANEL MENYALA DENGAN BENAR.**
+
+---
+
+## Sesi 24 — 2026-06-22 | Telegram & X scraper Agent A via Apify + config LIMIT via .env
+
+### 📌 Ringkasan
+Membangun modul scraper Telegram dan X untuk Agent A pakai Apify (`apify-client==3.0.3`), lalu gabung ke pipeline `agent_a.py` sebagai data source beneran (ganti mock yang tadinya ada di script). Akhir sesi: mock hilang total, konstanta `LIMIT` pindah dari hardcode ke `.env` lewat `AGENT_A_SCRAPER_LIMIT` (fallback default `2`). Pipeline Agent A sekarang full real-data: DexScreener (free) → Web3 EIP-55 checksum → X via Apify → Telegram via Apify → kalau WARNING keyword match, blacklist tanpa LLM; kalau OPPORTUNITY match, emit JSON Line ke stdout.
+
+### ✅ Hal yang Berhasil Dikerjakan
+
+| Item | Detail |
+|------|--------|
+| `requirements.txt` | Tambah `apify-client==3.0.3` (match versi yang ter-install di `venv/`; versi 1.6.4 yang coba duluan deprecated, API-nya beda total) |
+| `agent_a.py` | Merge `test/agent_a_scraper.py` (legacy) + `test/test_agent_a_scout.py` (v4 spec) jadi 1 file di root. 280 baris, 8248 bytes. Isinya: `OPPORTUNITY_KEYWORDS` (21 item Base ecosystem), `WARNING_KEYWORDS` (10 item rug/scam/honeypot), Web3 EIP-55 checksum, WARNING shortcut blacklist, JSON Lines emit ke stdout |
+| Mock removal | Hapus total dari `agent_a.py`: `_MOCK_TOKENS`, `_MOCK_MENTIONS`, 4 function `_mock_fetch_*`, `_apply_mocks()`, CLI flag `--mock` |
+| LIMIT hardcode | Drop `--limit` CLI flag + argparse + sys import. Ganti dengan konstanta `LIMIT = 2` di module level |
+| Config LIMIT via `.env` | Section `##limit agent a scraper` (lowercase, double-hash sesuai request) + var `AGENT_A_SCRAPER_LIMIT=2`. `agent_a.py` diupdate: `from dotenv import load_dotenv`, `load_dotenv()` call, helper `_resolve_agent_a_limit()` dengan fallback 2 + validasi `< 1` → warn ke stdout |
+| Debug `apify-client` 3.x | 3x patch buat handle API yang beda dari 1.x: `list = None` → `list \| None = None`, `ApifyClientAsync` butuh `# type: ignore[misc]`, `Run.default_dataset_id` (snake_case Pydantic), `.dataset(id).list_items().items` (DatasetItemsPage dataclass) bukan `.iterate_items()` |
+| Fix Telegram actor schema | Field `mode` required (default `channel` → 0 results kalau `channels: []`). `maxResultsPerKeyword` min=10 max=100. Set `"mode": "keyword"` eksplisit biar scraper pakai keyword search across all public channels |
+| Drop Farcaster | `webdatalabs/farcaster-hub-scraper` ternyata scrape by FIDs (bukan keywords). Nggak ada Farcaster scraper gratis lain di Apify store. Credit tipis → drop total, fokus ke X + Telegram |
+| Real call Telegram | 1 hit ke `lofomachines/telegram-keyword-search-scraper` SUCCEEDED, dapet 2 messages dari MetricBase token |
+
+### ✏️ File yang DIUBAH / DITAMBAHKAN
+
+| File | Lokasi | Detail Perubahan |
+|------|--------|------------------|
+| `requirements.txt` | `/` | Tambah `apify-client==3.0.3` di section pin |
+| `agent_a.py` | `/` | **Baru** — main pipeline hasil konsolidasi (280 baris, 8248 bytes) |
+| `.env` | `/` | Tambah section `##limit agent a scraper` + `AGENT_A_SCRAPER_LIMIT=2` (di bawah section OSINT) |
+| `test/agent_a_scraper.py` | `/test/` | Dihapus via git (konten sudah digabung ke `agent_a.py`) |
+| `test/test_agent_a_scout.py` | `/` | Pindah ke `test_agent-a-passed/test_agent_a_scout.py` |
+
+### 🏗️ Keputusan Desain
+
+| Aspek | Keputusan |
+|-------|-----------|
+| Apify client | `apify-client==3.0.3` sync `ApifyClient` (bukan async, lebih simpel untuk per-call use case) |
+| Actor Telegram | `lofomachines/telegram-keyword-search-scraper`, mode `keyword`, channels `[]`, maxItems `10` |
+| Actor X | `apify/twitter-scraper`, searchTerms + maxItems |
+| LIMIT resolution | `os.getenv("AGENT_A_SCRAPER_LIMIT")` → fallback 2. Shell env MENANG dari `.env` (`load_dotenv(override=False)`) |
+
+### 🧪 Verifikasi
+
+```bash
+python -m py_compile agent_a.py      # OK
+```
+
+LIMIT resolution (4 skenario):
+
+| Input | Hasil |
+|-------|-------|
+| (default) | `2` |
+| `5` | `5` |
+| `abc` | warn + `2` |
+| `0` | warn + `2` |
+
+Telegram real call: 1 hit, 2 messages, SUCCEEDED.
+
+**Status: ✅ AGENT A SCRAPER APIFY READY, LIMIT CONFIG VIA .ENV, MOCK PURGED.**
+
+---
+
+## Sesi 25 — 2026-07-03 | Pipeline Rebuild: Async Producer–Worker + DB Abstraction + Verified Mock Tests
+
+### 📌 Ringkasan
+Ganti 3 file produksi (`db_pipeline.py`, `agent_a_producer.py`, `agent_b_worker.py`) dengan implementasi async murni sesuai spec AMD Hackathon. Tambah `requirements.txt` lock file (`pip freeze`), lalu bangun unit-test mock 3 file di folder `test/` (10 + 16 + 8 = **34 tes, semua PASS, exit 0, ~0.86 s**). Folder `test/` dihapus manual user setelahnya.
+
+### ✅ Hal yang Berhasil Dikerjakan
+
+| Item | Detail |
+|------|--------|
+| `db_pipeline.py` | asyncpg-only, `create_pool`, `fetch_and_lock_pending_task` (`FOR UPDATE SKIP LOCKED`), `update_task_status` (retry → force FAILED di retry ke-3), `insert_to_queue` (`ON CONFLICT DO NOTHING`), `insert_to_blacklist`, `get_queue_stats` |
+| `agent_a_producer.py` | Agent A Scout: DexScreener + Neynar + Basescan + CoinGecko → 21 keyword opportunity / 10 warning → blacklist skip → AI scoring (mock 85 saat API key kosong) → loop 15 menit |
+| `agent_b_worker.py` | Agent B Vault: 5 gates: GoPlus (honeypot/tax>10%) → AI → score≥80 → budget circuit (cycle $5/day $20/3 fail) → execute_tx (mint/claim) di Base Sepolia/Mainnet via fallback RPC |
+| `requirements.txt` | `pip freeze > requirements.txt` (132 packages: aiohttp 3.14, asyncpg 0.30, web3, pytest, pytest-asyncio) |
+| Folder `test/` | `conftest.py`, `test_db.py`, `test_agent_a.py`, `test_agent_b.py`, `TESTING_GUIDE.md` (panduan manual: setup DB, API key, run pytest, troubleshooting) |
+| Mock tests | 34 unit tests pass: keyword match, fetcher paths, bypass AI, retry cap, fetch_and_lock, queue insert duplicate, blacklist, queue stats, Web3 chain select, GoPlus safe/honeypot/tax, worker idle loop |
+
+### ✏️ File yang DIUBAH / DITAMBAHKAN
+
+| File | Lokasi | Detail Perubahan |
+|------|--------|------------------|
+| `db_pipeline.py` | `/` | Full overwrite (240 baris, 7.4 KB) asyncpg wrapper |
+| `agent_a_producer.py` | `/` | Full overwrite (350 baris, 13.7 KB) Scout async pipeline |
+| `agent_b_worker.py` | `/` | Full overwrite (390 baris, 16.9 KB) Vault 5-gate worker |
+| `requirements.txt` | `/` | Locked 132 packages via `pip freeze` |
+| `test/conftest.py` | `/test/` | Test env loader + 132 fixtures (sudah dihapus user) |
+| `test/test_db.py` | `/test/` | 10 tests DB (sudah dihapus user) |
+| `test/test_agent_a.py` | `/test/` | 16 tests Agent A (sudah dihapus user) |
+| `test/test_agent_b.py` | `/test/` | 8 tests Agent B (sudah dihapus user) |
+| `test/TESTING_GUIDE.md` | `/test/` | Manual guide Postgres + API key (sudah dihapus user) |
+
+### 🏗️ Keputusan Desain
+
+| Aspek | Keputusan |
+|-------|-----------|
+| DB locking | `FOR UPDATE SKIP LOCKED` row-level untuk multi-worker safety |
+| Retry policy | `retry_count >= 3` → force FAILED permanen, tidak di-reset |
+| Header budget | 4 budget constants dari `.env`: `MAX_TX_AMOUNT_USD=$2`, cycle $5, day $20, 3 consecutive fail |
+| Network switch | `ACTIVE_NETWORK` runtime-read; fallback RPC chain `BASE_*` → `BASE_SEPOLIA_*` |
+| Keyword guard | WARNING checked SEBELUM opportunity; matched → blacklist insert + skip |
+| AI bypass | API key kosong → hardcode score 85 + reason "High Farcaster engagement, verified contract" |
+| Test mocking | `AsyncContextManagerMock` pattern + `MagicMock.acquire` wrapper untuk asyncpg pool |
+
+### 🧪 Verifikasi
+
+```bash
+python -m py_compile db_pipeline.py agent_a_producer.py agent_b_worker.py   # OK
+pytest -q test/test_db.py test/test_agent_a.py test/test_agent_b.py           # 34 passed
+```
+
+Mock smoke (tanpa DB):
+- `agent_a_producer.py` boot 12 s, exit 0 (no import/runtime crash)
+- `agent_b_worker.py` cage: `⚠️ Worker loop failed: Connect call failed ('127.0.0.1', 5432)` → graceful exit 2.6 s, summary dicetak (sesuai requirement "never crash pipeline on single failure")
+
+**Status: ✅ ASYNC PIPELINE REBUILT, 34/34 MOCK TESTS PASS, TEST FOLDER DI-removed USER-SIDE.**
+
+### 🔄 ENV Sync — Script ↔ .env Sinkron
+
+Audit menemukan 6 key dipakai script tapi absent di `.env` (`ACTIVE_NETWORK`, `BATCH_SIZE`, `MAX_TX_AMOUNT_USD`, `MAX_SPEND_PER_CYCLE_USD`, `MAX_DAILY_SPEND_USD`, `CONSECUTIVE_FAIL_LIMIT`). Append-only ke `.env` line 54–61. Script `os.getenv(...)` cocok tanpa rewrite karena default fallback identik. Final env count: 30 keys.
+
+Ringkasan fungsi script (real-not-mock):
+
+| File | Fungsi |
+|------|--------|
+| `agent_a_producer.py` | Cari token Base di DexScreener → enrichment (Neynar + Basescan + CoinGecko) → filter keyword (21 opportunity, 10 warning/blacklist) → AI score → masukin ke queue DB. Loop tiap 15 menit. |
+| `agent_b_worker.py` | Ambil task dari queue → cek keamanan (GoPlus honeypot/tax) → cek skor AI → cek budget (cycle $5, day $20, 3x fail = pause 10 menit) → eksekusi mint/claim on-chain lewat RPC. Loop terus. |
+| `db_pipeline.py` | Wrapper asyncpg: create pool, lock task dengan `FOR UPDATE SKIP LOCKED`, update status (retry max 3x), insert task & blacklist, ambil statistik. |
+| `database_schema_v2.sql` | Definisikan 2 tabel Postgres: `scraping_queue` (antrian task) & `blacklist` (alamat banned), lengkap dengan index + trigger auto-update timestamp. |
+| `web3_async.py` | Utilitas Web3 async: konversi Wei/ETH, estimasi gas EIP-1559 aggressive, kirim tx + retry. |
+
+**Status: ✅ ENV SINKRON, SCRIPT IN-SYNC, ZERO SCRIPT REWRITE, ZERO .env MUTATION ON EXISTING KEYS.**
