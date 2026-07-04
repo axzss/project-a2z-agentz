@@ -5,6 +5,7 @@ import { ToastProvider } from "@/components/ui/Toast";
 import { AuthProvider } from "@/components/AuthProvider";
 import PWARegister from "@/components/ui/PWARegister";
 import { RouteProgress } from "@/components/ui/RouteProgress";
+import { Suspense } from "react";
 
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"] });
 const ibmPlexSerif = IBM_Plex_Serif({
@@ -65,10 +66,12 @@ export default function RootLayout({
       >
         <PWARegister />
         <ToastProvider>
-          <AuthProvider>
-            <RouteProgress />
-            {children}
-          </AuthProvider>
+          <Suspense fallback={null}>
+            <AuthProvider>
+              <RouteProgress />
+              {children}
+            </AuthProvider>
+          </Suspense>
         </ToastProvider>
       </body>
     </html>
