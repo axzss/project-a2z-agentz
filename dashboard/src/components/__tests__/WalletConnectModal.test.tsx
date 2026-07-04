@@ -4,6 +4,20 @@ import userEvent from "@testing-library/user-event";
 import React from "react";
 import WalletConnectModal from "../WalletConnectModal";
 
+const mockLoginWithWallet = vi.fn();
+const mockLoginAsGuest = vi.fn();
+
+vi.mock("@/components/AuthProvider", () => ({
+  useAuth: () => ({
+    loginWithWallet: mockLoginWithWallet,
+    loginAsGuest: mockLoginAsGuest,
+  }),
+}));
+
+vi.mock("@/lib/auth", () => ({
+  getWalletNonce: vi.fn(async () => "test-nonce-123"),
+}));
+
 function setEthereum(provider: unknown) {
   Object.defineProperty(window, "ethereum", {
     value: provider,
@@ -17,6 +31,7 @@ describe("WalletConnectModal", () => {
     localStorage.clear();
     document.cookie = "a2z-wallet-session=; Max-Age=0; path=/";
     setEthereum(undefined);
+    vi.clearAllMocks();
   });
 
   it("does not render when closed", () => {
@@ -33,12 +48,13 @@ describe("WalletConnectModal", () => {
     expect(screen.getByText("Browser Wallet")).toBeTruthy();
   });
 
-  it("connects detected wallet and shows SIWE warning", async () => {
+  it("connects detected wallet, prompts personal_sign, and calls loginWithWallet", async () => {
     const request = vi.fn(async ({ method }: { method: string }) => {
       if (method === "eth_requestAccounts") {
         return ["0x1234567890abcdef1234567890abcdef12345678"];
       }
       if (method === "eth_chainId") return "0x2105";
+      if (method === "personal_sign") return "mock-sig-000";
       return null;
     });
     setEthereum({ isMetaMask: true, request });
@@ -48,12 +64,19 @@ describe("WalletConnectModal", () => {
     await userEvent.click(await screen.findByRole("button", { name: /connect metamask/i }));
 
     await waitFor(() => {
-      expect(screen.getByText(/Wallet login is frontend-only/i)).toBeTruthy();
+      expect(request).toHaveBeenCalledWith({
+        method: "personal_sign",
+        params: [
+          expect.stringContaining("test-nonce-123"),
+          "0x1234567890abcdef1234567890abcdef12345678",
+        ],
+      });
     });
-    expect(screen.getByText(/0x1234...5678/i)).toBeTruthy();
-    expect(onConnected).toHaveBeenCalledWith(
-      expect.objectContaining({ address: "0x1234567890abcdef1234567890abcdef12345678" })
+    expect(mockLoginWithWallet).toHaveBeenCalledWith(
+      "0x1234567890abcdef1234567890abcdef12345678",
+      "mock-sig-000"
     );
+    expect(onConnected).toHaveBeenCalled();
   });
 
   it("shows rejected connection error", async () => {
@@ -70,38 +93,14 @@ describe("WalletConnectModal", () => {
     });
   });
 
-  it("calls onContinue when continue button is clicked", async () => {
-    const request = vi.fn(async ({ method }: { method: string }) => {
-      if (method === "eth_requestAccounts") {
-        return ["0x1234567890abcdef1234567890abcdef12345678"];
-      }
-      if (method === "eth_chainId") return "0x2105";
-      return null;
-    });
-    setEthereum({ isMetaMask: true, request });
-    const onContinue = vi.fn();
-
-    render(<WalletConnectModal open onClose={vi.fn()} onContinue={onContinue} />);
-    await userEvent.click(await screen.findByRole("button", { name: /connect metamask/i }));
-    await userEvent.click(await screen.findByRole("button", { name: /continue to dashboard/i }));
-
-    expect(onContinue).toHaveBeenCalled();
-  });
-
-  it("allows connecting mock wallet when no provider exists (demo mode)", async () => {
-    const onContinue = vi.fn();
-    render(<WalletConnectModal open onClose={vi.fn()} onContinue={onContinue} />);
+  it("allows connecting mock wallet when no provider exists (demo/guest mode)", async () => {
+    render(<WalletConnectModal open onClose={vi.fn()} />);
     
-    // In demo mode, even if "install required", clicking should generate a mock connection
+    // In demo mode, clicking should trigger loginAsGuest
     await userEvent.click(await screen.findByRole("button", { name: /connect metamask/i }));
     
     await waitFor(() => {
-      expect(screen.getByText(/Wallet login is frontend-only/i)).toBeTruthy();
+      expect(mockLoginAsGuest).toHaveBeenCalled();
     });
-    
-    expect(screen.getByText(/0x[a-fA-F0-9]{4}\.\.\.[a-fA-F0-9]{4}/i)).toBeTruthy();
-    
-    await userEvent.click(screen.getByRole("button", { name: /continue to dashboard/i }));
-    expect(onContinue).toHaveBeenCalled();
   });
 });

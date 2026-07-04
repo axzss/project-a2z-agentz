@@ -52,3 +52,19 @@ export async function me(): Promise<User | null> {
 export async function logout(): Promise<void> {
   await apiFetch("/api/auth/logout", { method: "POST" });
 }
+
+export async function getWalletNonce(): Promise<string> {
+  const data = await apiFetch<{ nonce: string }>("/api/auth/wallet/nonce");
+  return data.nonce;
+}
+
+export async function verifyWalletSignature(
+  address: string,
+  signature: string
+): Promise<User> {
+  const data = await apiFetch<{ user: User }>("/api/auth/wallet/verify", {
+    method: "POST",
+    body: JSON.stringify({ address, signature }),
+  });
+  return data.user;
+}

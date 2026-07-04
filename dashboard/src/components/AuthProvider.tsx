@@ -16,6 +16,7 @@ interface AuthContextValue {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginWithWallet: (address: string, signature: string) => Promise<void>;
   register: (
     email: string,
     password: string,
@@ -83,6 +84,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [router, searchParams, toast]
   );
 
+  const loginWithWallet = useCallback(
+    async (address: string, signature: string) => {
+      try {
+        const u = await authLib.verifyWalletSignature(address, signature);
+        setUser(u);
+        const next = searchParams.get("next") || "/dashboard";
+        router.push(next);
+      } catch (err: unknown) {
+        const message =
+          err instanceof Error ? err.message : "Wallet auth failed";
+        toast.error("Wallet login failed", message);
+        throw err;
+      }
+    },
+    [router, searchParams, toast]
+  );
+
   const handleRegister = useCallback(
     async (
       email: string,
@@ -133,6 +151,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         loading,
         login: handleLogin,
+        loginWithWallet,
         register: handleRegister,
         logout: handleLogout,
         refresh,

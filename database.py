@@ -342,6 +342,27 @@ def get_user_by_email(email: str) -> dict:
         return None
     return None
 
+def get_user_by_wallet(wallet_address: str) -> dict:
+    if not wallet_address:
+        return None
+    query = "SELECT id, email, wallet_address, created_at, last_login_at FROM users WHERE UPPER(wallet_address) = UPPER(%s) LIMIT 1;"
+    try:
+        with _get_cursor() as cur:
+            cur.execute(query, (wallet_address.strip(),))
+            row = cur.fetchone()
+            if row:
+                return {
+                    'id': row[0],
+                    'email': row[1],
+                    'wallet_address': row[2],
+                    'created_at': row[3].strftime('%Y-%m-%d %H:%M:%S') if row[3] else None,
+                    'last_login_at': row[4].strftime('%Y-%m-%d %H:%M:%S') if row[4] else None
+                }
+    except psycopg2.Error as exc:
+        logger.error("get_user_by_wallet failed: %s", exc)
+        return None
+    return None
+
 def get_user_by_id(user_id: int) -> dict:
     query = "SELECT id, email, wallet_address, created_at, last_login_at FROM users WHERE id = %s LIMIT 1;"
     try:

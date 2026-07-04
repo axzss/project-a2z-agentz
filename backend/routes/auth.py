@@ -121,9 +121,122 @@ async def logout(request: Request):
     )
     return response
 
+import uuid
+from eth_account import Account
+from eth_account.messages import encode_defunct
+from agent_a import normalize_address
+
+async def wallet_nonce(request: Request):
+    nonce = os.urandom(16).hex()
+    response = JSONResponse({"nonce": nonce})
+    response.set_cookie(
+        key="a2z-wallet-nonce",
+        value=nonce,
+        httponly=True,
+        path="/",
+        max_age=300, # 5 minutes
+        samesite="lax",
+        secure=False
+    )
+    return response
+
+async def wallet_verify(request: Request):
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+    
+    address = data.get("address")
+    signature = data.get("signature")
+    
+    if not address or not signature:
+        return JSONResponse({"error": "Address and signature are required"}, status_code=400)
+        
+    nonce = request.cookies.get("a2z-wallet-nonce")
+    if not nonce:
+        return JSONResponse({"error": "Nonce expired or not requested. Please try again."}, status_code=400)
+        
+    checksum_address = normalize_address(address)
+    if not checksum_address:
+        return JSONResponse({"error": "Invalid Ethereum address format"}, status_code=400)
+        
+    # Standard SIWE message format or plain nonce format
+    message_text_siwe = f"Sign in to A2Z Agentz\nAddress: {checksum_address}\nNonce: {nonce}"
+    message_text_plain = nonce
+    
+    recovered_address = None
+    
+    # Try SIWE message first
+    try:
+        msg = encode_defunct(text=message_text_siwe)
+        recovered_address = Account.recover_message(msg, signature=signature)
+    except Exception:
+        pass
+        
+    # If failed, try plain nonce message
+    if not recovered_address or recovered_address.lower() != checksum_address.lower():
+        try:
+            msg = encode_defunct(text=message_text_plain)
+            recovered_address = Account.recover_message(msg, signature=signature)
+        except Exception:
+            pass
+            
+    if not recovered_address or recovered_address.lower() != checksum_address.lower():
+        return JSONResponse({"error": "Signature verification failed. Invalid signer address."}, status_code=401)
+        
+    # Signature is valid! Get or create user
+    user = database.get_user_by_wallet(checksum_address)
+    if not user:
+        # Create shadow user
+        email = f"wallet-{checksum_address.lower()}@a2z.internal"
+        existing_email_user = database.get_user_by_email(email)
+        if existing_email_user:
+            user = existing_email_user
+        else:
+            hashed_pwd = hash_password(str(uuid.uuid4()))
+            user = database.create_user(email, hashed_pwd, checksum_address)
+            if not user:
+                return JSONResponse({"error": "Failed to create user session"}, status_code=500)
+                
+    # Update login timestamp
+    database.update_last_login(user["id"])
+    user["last_login_at"] = database.get_user_by_id(user["id"])["last_login_at"] # Refresh
+    
+    # Create token session
+    token = create_access_token({"sub": str(user["id"]), "email": user["email"]})
+    
+    user.pop("password_hash", None)
+    response = JSONResponse({"user": user})
+    
+    # Set login cookie
+    response.set_cookie(
+        key="a2z-token",
+        value=token,
+        httponly=True,
+        path="/",
+        max_age=604800, # 7 days
+        samesite="lax",
+        secure=False
+    )
+    
+    # Clear the temporary nonce cookie
+    response.set_cookie(
+        key="a2z-wallet-nonce",
+        value="",
+        httponly=True,
+        path="/",
+        max_age=0,
+        samesite="lax",
+        secure=False
+    )
+    
+    return response
+
 routes = [
     Route("/register", register, methods=["POST"]),
     Route("/login", login, methods=["POST"]),
     Route("/me", me, methods=["GET"]),
-    Route("/logout", logout, methods=["POST"])
+    Route("/logout", logout, methods=["POST"]),
+    Route("/wallet/nonce", wallet_nonce, methods=["GET"]),
+    Route("/wallet/verify", wallet_verify, methods=["POST"])
 ]

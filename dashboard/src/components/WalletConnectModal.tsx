@@ -1,9 +1,11 @@
 "use client";
 
-import React, { useEffect } from "react";
-import { Wallet, X, Loader2, ShieldAlert } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { Wallet, X, Loader2 } from "lucide-react";
 import { useWalletConnect } from "@/hooks/useWalletConnect";
 import type { WalletSession, WalletStatus } from "@/lib/wallet";
+import { useAuth } from "@/components/AuthProvider";
+import { getWalletNonce } from "@/lib/auth";
 
 interface WalletConnectModalProps {
   open: boolean;
@@ -45,9 +47,11 @@ export default function WalletConnectModal({
   open,
   onClose,
   onConnected,
-  onContinue,
 }: WalletConnectModalProps) {
   const wallet = useWalletConnect();
+  const { loginWithWallet, loginAsGuest } = useAuth();
+  const [authLoading, setAuthLoading] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -117,10 +121,49 @@ export default function WalletConnectModal({
             <button
               key={option.id}
               onClick={async () => {
-                const session = await wallet.connect(option);
-                if (session) onConnected?.(session);
+                setAuthError(null);
+                setAuthLoading(true);
+                try {
+                  const session = await wallet.connect(option);
+                  if (!session) {
+                    setAuthLoading(false);
+                    return;
+                  }
+
+                  if (!option.provider) {
+                    loginAsGuest();
+                    onClose();
+                    return;
+                  }
+
+                  const nonce = await getWalletNonce();
+                  const message = `Sign in to A2Z Agentz\nAddress: ${session.address}\nNonce: ${nonce}`;
+                  
+                  const signature = await option.provider.request({
+                    method: "personal_sign",
+                    params: [message, session.address],
+                  });
+
+                  if (!signature || typeof signature !== "string") {
+                    throw new Error("No signature returned from wallet");
+                  }
+
+                  await loginWithWallet(session.address, signature);
+                  
+                  onConnected?.(session);
+                  onClose();
+                } catch (err: unknown) {
+                  console.error(err);
+                  setAuthError(
+                    err instanceof Error
+                      ? err.message
+                      : "Authentication failed. Please try again."
+                  );
+                } finally {
+                  setAuthLoading(false);
+                }
               }}
-              disabled={wallet.state === "connecting"}
+              disabled={wallet.state === "connecting" || authLoading}
               aria-label={`Connect ${option.name}`}
               className="flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-all hover:opacity-85 disabled:opacity-60 focus-ring"
               style={{
@@ -149,14 +192,14 @@ export default function WalletConnectModal({
           ))}
         </div>
 
-        {wallet.state === "connecting" && (
+        {(wallet.state === "connecting" || authLoading) && (
           <p className="mt-3 flex items-center gap-2 text-sm" style={{ color: "var(--color-body-subtle)" }}>
             <Loader2 className="h-4 w-4 animate-spin text-[var(--color-fg-brand)]" aria-hidden="true" />
-            Waiting for wallet approval...
+            Waiting for wallet & signature approval...
           </p>
         )}
 
-        {wallet.error && (
+        {(wallet.error || authError) && (
           <p
             role="alert"
             className="mt-3 rounded-xl border p-3 text-sm"
@@ -166,54 +209,20 @@ export default function WalletConnectModal({
               background: "color-mix(in srgb, var(--color-fg-danger) 12%, transparent)",
             }}
           >
-            {wallet.error}
+            {wallet.error || authError}
           </p>
         )}
 
         <div
           className="mt-4 rounded-xl border p-3 text-xs"
           style={{
-            color: "var(--color-fg-info)",
-            borderColor: "var(--color-border-default)",
-            background: "color-mix(in srgb, var(--color-fg-info) 10%, transparent)",
+            color: "var(--color-fg-success)",
+            borderColor: "var(--color-fg-success)",
+            background: "color-mix(in srgb, var(--color-fg-success) 10%, transparent)",
           }}
         >
-          Wallet login currently creates a frontend-only session until backend SIWE is
-          implemented.
+          🔒 Connection is secured using end-to-end cryptographic signatures.
         </div>
-
-        {wallet.session && (
-          <div
-            className="mt-4 rounded-xl border p-4"
-            style={{
-              color: "var(--color-fg-warning)",
-              borderColor: "var(--color-fg-warning)",
-              background: "color-mix(in srgb, var(--color-fg-warning) 12%, transparent)",
-            }}
-          >
-            <div className="flex items-start gap-2">
-              <ShieldAlert className="mt-0.5 h-4 w-4" aria-hidden="true" />
-              <div>
-                <h3 className="font-semibold">Wallet login is frontend-only</h3>
-                <p className="mt-1 text-xs leading-relaxed">
-                  Connected as <span className="font-mono">{wallet.formattedAddress}</span>.
-                  Backend SIWE is not ready yet, so protected backend auth still requires
-                  email/password.
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={onContinue}
-              className="mt-4 w-full rounded-xl px-4 py-3 text-sm font-semibold focus-ring"
-              style={{
-                background: "var(--color-fg-warning)",
-                color: "var(--color-neutral-primary)",
-              }}
-            >
-              Continue to dashboard
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );
