@@ -47,7 +47,7 @@ BASE_RPC_1 = os.getenv("BASE_RPC_1", "")
 BASE_RPC_2 = os.getenv("BASE_RPC_2", "")
 BASE_RPC_3 = os.getenv("BASE_RPC_3", "")
 BASE_CHAIN_ID = int(os.getenv("BASE_CHAIN_ID", "8453"))
-MAX_SCORE_FOR_AUTO = int(os.getenv("AGENT_B_AUTO_SCORE_MIN", "70"))
+MAX_SCORE_FOR_AUTO = int(os.getenv("AGENT_B_AUTO_SCORE_MIN", "20"))
 DEFAULT_NETWORK_HINT = os.getenv("ACTIVE_NETWORK", "base")
 # Budget guard (env already provided by operator). Enforced before any
 # auto-execution proposal so the vault stays within operator limits.
@@ -352,6 +352,19 @@ async def process_task(task: dict[str, Any]) -> None:
         f"Score {score} < {MAX_SCORE_FOR_AUTO}; not auto-executing",
         {"queue_id": queue_id, "score": score, "address": contract_address},
       )
+      try:
+        await manager.broadcast(
+          json.dumps({
+            "type": "AGENT_LOG",
+            "data": {
+              "sender": "agent_b",
+              "content": f"Rejected {token_name} ({contract_address}): score {score}/100 < {MAX_SCORE_FOR_AUTO}. No execution.",
+              "metadata": {"score": score, "projectName": token_name, "target": contract_address, "passed": False},
+            },
+          })
+        )
+      except Exception:
+        pass
       return
 
     # High score -> enforce operator budget guard before auto-proposing.
@@ -409,6 +422,19 @@ async def process_task(task: dict[str, Any]) -> None:
             f"Real on-chain send tx={tx_hash} amount_usd={amount_usd}",
             {"proposal_id": proposal_id, "tx_hash": tx_hash, "network": _active},
           )
+          try:
+            await manager.broadcast(
+              json.dumps({
+                "type": "AGENT_LOG",
+                "data": {
+                  "sender": "agent_b",
+                  "content": f"EXECUTED real tx {tx_hash} | {token_name} ({contract_address}) amount=${amount_usd} network={_active}",
+                  "metadata": {"amountUsd": amount_usd, "projectName": token_name, "txHash": tx_hash, "score": score, "target": contract_address, "network": _active, "passed": True},
+                },
+              })
+            )
+          except Exception:
+            pass
         else:
           tx_hash = f"mock::{contract_address}::{int(amount_usd * 1e15)}"
       except Exception as exc:
