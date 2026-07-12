@@ -9,6 +9,7 @@ import DashboardKpis from "@/components/DashboardKpis";
 import PageHeader from "@/components/PageHeader";
 import AgentCommPanel from "@/components/AgentCommPanel";
 import A2AIdentityReadiness from "@/components/A2AIdentityReadiness";
+import ScannedTokensFeed from "@/components/ScannedTokensFeed";
 import { useDashboard } from "@/components/DashboardContext";
 import { useAuth } from "@/components/AuthProvider";
 import { LayoutDashboard } from "lucide-react";
@@ -59,8 +60,15 @@ export default function Home() {
 
       <motion.div variants={itemVariants}>
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-          <AgentCommPanel />
+          <ScannedTokensFeed />
           <LiveLog />
+        </div>
+      </motion.div>
+
+      <motion.div variants={itemVariants}>
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          <AgentCommPanel />
+          <div className="hidden xl:block" />
         </div>
       </motion.div>
 

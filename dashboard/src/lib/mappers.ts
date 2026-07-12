@@ -13,6 +13,10 @@ export interface MappedAgentMessage {
     score?: number;
     projectName?: string;
     amountUsd?: number;
+    source?: string;
+    target?: string;
+    category?: string;
+    passed?: boolean;
   };
 }
 
