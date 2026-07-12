@@ -489,7 +489,10 @@ async def worker_loop(poll_interval: float = 2.0) -> None:
   while True:
     task = fetch_and_lock_pending_task(limit=1)
     if task is None:
-      break # Exit the cycle when no more tasks
+      # No pending tasks right now — keep the worker alive so newly
+      # enqueued tokens from Agent A are picked up without a restart.
+      await asyncio.sleep(poll_interval)
+      continue
     try:
       await process_task(task)
     except Exception as exc:
