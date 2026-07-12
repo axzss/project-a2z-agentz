@@ -98,6 +98,10 @@ export interface AgentMessage {
     score?: number;
     projectName?: string;
     amountUsd?: number;
+    source?: string;
+    target?: string;
+    category?: string;
+    passed?: boolean;
   };
 }
 
