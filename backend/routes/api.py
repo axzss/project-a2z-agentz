@@ -790,6 +790,28 @@ async def get_execution_status(request: Request):
 
 
 @require_auth
+async def get_pending_approvals(request: Request):
+    """
+    GET /approvals
+    Returns transactions currently awaiting manual approval.
+    """
+    try:
+        with database._get_cursor(dict_rows=True) as cur:
+            cur.execute(
+                "SELECT tx_hash_id, project_target_address, amount_usd, status, created_at FROM execution_logs WHERE UPPER(status) = 'PENDING_APPROVAL' ORDER BY created_at DESC LIMIT 100"
+            )
+            rows = cur.fetchall()
+        for t in rows:
+            if "created_at" in t and t["created_at"]:
+                t["created_at"] = str(t["created_at"])
+            if "amount_usd" in t and t["amount_usd"] is not None:
+                t["amount_usd"] = float(t["amount_usd"])
+        return JSONResponse({"status": "ok", "approvals": rows})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@require_auth
 async def get_gpu_metrics(request: Request):
     """Live AMD GPU metrics (Agent A brain on vLLM)."""
     gpu = _fetch_gpu_metrics()
@@ -808,4 +830,5 @@ routes = [
     Route("/gpu-metrics", get_gpu_metrics, methods=["GET"]),
     Route("/analyze", analyze_target, methods=["POST"]),
     Route("/status", get_execution_status, methods=["GET"]),
+    Route("/approvals", get_pending_approvals, methods=["GET"]),
 ]

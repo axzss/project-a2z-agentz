@@ -349,6 +349,7 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
       }
 
       // Real agent status from backend health (not hardcoded).
+  // Real agent status from backend health (not hardcoded).
       if (sysData?.agent_health) {
         const h: any = sysData.agent_health;
         const now = Date.now() / 1000;
@@ -485,23 +486,23 @@ export function DashboardProvider({ children }: { children: React.ReactNode }) {
   }, [approvalQueue.length]);
 
   const handleApprove = useCallback(
-    (id: string) => {
-      const item = approvalQueue.find((a) => a.id === id);
-      if (!item) return;
-      setApprovalQueue((prev) => prev.filter((a) => a.id !== id));
-      const newTx: Transaction = {
-        id: genId(), projectName: item.projectName, targetAddress: item.targetAddress,
-        amountUsd: item.amountUsd, status: "success", txHash: genTxHash(),
-        timestamp: new Date(), reason: item.reason, gasUsedGwei: randInt(35, 65),
-      };
-      setTransactions((prev) => [newTx, ...prev]);
-      addLog("SUCCESS", `Manual approval: ${item.projectName} $${item.amountUsd} executed`);
-      setAgentMessages((prev) => [
-        ...prev,
-        { id: genId(), sender: "system" as const, content: `Human approved: ${item.projectName} ($${item.amountUsd}). Executing via Agent B.`, timestamp: new Date(), status: "done" as const },
-      ].slice(-50));
-    },
-    [approvalQueue, addLog]
+  (id: string) => {
+    const item = approvalQueue.find((a) => a.id === id);
+    if (!item) return;
+    setApprovalQueue((prev) => prev.filter((a) => a.id !== id));
+    const newTx: Transaction = {
+      id: genId(), projectName: item.projectName, targetAddress: item.targetAddress,
+      amountUsd: item.amountUsd, status: "success", txHash: genTxHash(),
+      timestamp: new Date(), reason: item.reason, gasUsedGwei: randInt(35, 65),
+    };
+    setTransactions((prev) => [newTx, ...prev]);
+    addLog("SUCCESS", `Manual approval: ${item.projectName} $${item.amountUsd} executed`);
+    setAgentMessages((prev) => [
+      { id: genId(), sender: "agent_b", content: `Manual approval: ${item.projectName} $${item.amountUsd} executed`, metadata: { projectName: item.projectName, amountUsd: item.amountUsd }, timestamp: new Date(), status: "done" },
+      ...prev,
+    ].slice(-50));
+  },
+  [approvalQueue, addLog]
   );
 
   const handleReject = useCallback(

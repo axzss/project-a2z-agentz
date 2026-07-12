@@ -294,6 +294,30 @@ async def process_task(task: dict[str, Any]) -> None:
         )
         return
       raise
+    if payload.get("agent_a_passed") is False:
+      reason = (inference.get("reason") or "agent_a_rejected").split("|")[0].strip()
+      reason = reason or "agent_a_rejected"
+      update_task_status(queue_id, "COMPLETED", retry=False)
+      append_audit_log(
+        "agent_b.agent_a_rejected",
+        f"Skipped by Agent A passed=false: {reason}",
+        {"queue_id": queue_id, "address": contract_address, "agent_a_reason": reason},
+      )
+      try:
+        await manager.broadcast(
+          json.dumps({
+            "type": "AGENT_LOG",
+            "data": {
+              "sender": "agent_b",
+              "content": f"Rejected {token_name} ({contract_address}): Agent A pre-filter did not pass. {reason}",
+              "metadata": {"score": 0, "projectName": token_name, "target": contract_address, "passed": False, "reason": reason},
+            },
+          })
+        )
+      except Exception:
+        pass
+      return
+
     result = goplus_raw.get("result") if isinstance(goplus_raw, dict) else None
     if isinstance(result, dict):
       # Pass a richer signal set to the LLM: honeypot/tax basics plus the
