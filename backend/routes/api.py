@@ -57,7 +57,7 @@ def check_auth(request: Request) -> bool:
 
     token = bearer or request.cookies.get("a2z-token")
     if token == "guest":
-        return False
+        return True  # guest demo mode: read-only mock access, no real user
     if token and verify_access_token(token):
         return True
 
@@ -91,8 +91,12 @@ def require_auth(func):
     return wrapper
 
 
-def _get_uid(request: Request) -> int | None:
-    """Resolve the authenticated user_id from the bearer token (or admin)."""
+def _get_uid(request: Request) -> "int | str | None":
+    """Resolve the authenticated user_id from the bearer token (or admin).
+
+    Returns an int user_id, the guest sentinel string "__guest__" for demo
+    mode, or None if unauthenticated.
+    """
     auth_header = request.headers.get("Authorization", "")
     token = ""
     if auth_header.lower().startswith("bearer "):
@@ -109,11 +113,24 @@ def _get_uid(request: Request) -> int | None:
     # Read-only admin token maps to the system owner (id=1) for scoped reads.
     if ADMIN_TOKEN and token == ADMIN_TOKEN:
         return 1
+    if token == "guest":
+        return "__guest__"  # sentinel: demo mode, serve mock data (no DB)
     return None
+
+
+GUEST_SENTINEL = "__guest__"
+
+
+def _is_guest(uid) -> bool:
+    """True when the caller is the demo/guest sentinel (mock-only access)."""
+    return uid == GUEST_SENTINEL
 
 @require_auth
 async def get_stats(request: Request):
     """Returns global statistics for the dashboard."""
+    if _is_guest(_get_uid(request)):
+        from routes.mock_demo import GUEST_STATS
+        return JSONResponse(GUEST_STATS)
     try:
         with database._get_cursor(dict_rows=True) as cur:
             # Total transactions
@@ -994,6 +1011,11 @@ async def get_holdings(request: Request):
                              RPC call fails.
     """
     import httpx as _httpx
+
+    uid = _get_uid(request)
+    if _is_guest(uid):
+        from routes.mock_demo import GUEST_PORTFOLIO
+        return JSONResponse(GUEST_PORTFOLIO)
 
     # Testnet mode: bypass the DB entirely, read on-chain state live.
     network = (request.query_params.get("network") or "mainnet").strip().lower()
