@@ -130,11 +130,15 @@ segregation — production-ready by default, no code changes required.
 
 ## Contact & Support
 
-- **Support Email:** [archbusins@gmail.com](mailto:archbusins@gmail.com)
-- **Website:** [archbusins.web.id](https://archbusins.web.id)
+For technical inquiries, integration support, or partnership opportunities,
+reach out to the A2Z Agentz team:
+
+- **Email:** [archbusins@gmail.com](mailto:archbusins@gmail.com)
 
 ---
 
 ## License
 
-MIT
+Released under the **MIT License** — see [`LICENSE`](./LICENSE) for full terms.
+
+© 2026 A2Z Agentz. All rights reserved.
