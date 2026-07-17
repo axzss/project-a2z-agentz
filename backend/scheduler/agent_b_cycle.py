@@ -11,6 +11,7 @@ import logging
 import os
 import re
 import time
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 import aiohttp
@@ -752,6 +753,41 @@ async def process_task(task: dict[str, Any]) -> None:
         # EXECUTION ENFORCEMENT: insert proposal but DON'T let a failed insert
         # kill the thread -- log it and continue to send_native_transaction.
         try:
+            # P-OpsiA: LLM-driven limit-buy. If Agent A supplied a target_entry_usd,
+            # QUEUE a PENDING smart-buy order instead of buying immediately. The
+            # dedicated worker (scheduler/agent_smart_buy.py) polls price and fills
+            # when the market hits the LLM's entry. Anti-hallucination + expiry are
+            # enforced in the worker; here we only persist the intent.
+            _raw_target = (payload.get("target_entry_usd") or 0) or 0
+            try:
+                _target_entry = float(_raw_target)
+            except (TypeError, ValueError):
+                _target_entry = 0.0
+            if _target_entry > 0 and amount_usd > 0:
+                _ttl_hours = float(os.getenv("SMART_BUY_TTL_HOURS", "4"))
+                _expires = datetime.now(timezone.utc) + timedelta(hours=_ttl_hours)
+                _order_id = database.insert_smart_buy_order(
+                    user_id=_owner_id,
+                    token_address=contract_address,
+                    token_name=token_name,
+                    amount_wei=_usd_to_wei_real(amount_usd),
+                    target_entry_usd=_target_entry,
+                    expires_at=_expires,
+                    source="llm",
+                )
+                if _order_id:
+                    logger.info(
+                        "P-OpsiA smart-buy QUEUED order=%s user=%s token=%s target=$%.8f ttl=%.1fh",
+                        _order_id, _owner_id, contract_address, _target_entry, _ttl_hours,
+                    )
+                    append_audit_log(
+                        "agent_b.smart_buy_queued",
+                        f"LLM limit-buy queued order={_order_id} target=${_target_entry:.8f}",
+                        {"queue_id": queue_id, "order_id": _order_id, "user_id": _owner_id},
+                    )
+                    proposal_id = insert_transaction_proposal(synthesis_id, amount_usd, None)
+                    return  # queued; worker handles execution. Skip immediate buy.
+
             proposal_id = insert_transaction_proposal(synthesis_id, amount_usd, None)
             append_audit_log(
                 "agent_b.proposal_created",

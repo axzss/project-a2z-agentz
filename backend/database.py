@@ -971,6 +971,27 @@ def ensure_pipeline_tables() -> None:
                     """
                 )
                 cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS user_smart_buy_orders (
+                        id SERIAL PRIMARY KEY,
+                        user_id INTEGER NOT NULL,
+                        token_address VARCHAR(42) NOT NULL,
+                        token_name VARCHAR(255),
+                        amount_wei NUMERIC(78) NOT NULL DEFAULT 0,
+                        target_entry_usd NUMERIC(20, 8) NOT NULL,
+                        status VARCHAR(16) NOT NULL DEFAULT 'PENDING'
+                            CHECK (status IN ('PENDING','EXECUTED','CANCELLED','EXPIRED')),
+                        created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                        expires_at TIMESTAMP NOT NULL,
+                        executed_at TIMESTAMP,
+                        buy_tx_hash VARCHAR(66),
+                        executed_price_usd NUMERIC(20, 8),
+                        source VARCHAR(16) DEFAULT 'llm'
+                            CHECK (source IN ('llm','manual'))
+                    );
+                    """
+                )
+                cur.execute(
                     "CREATE INDEX IF NOT EXISTS user_limit_orders_user_idx ON user_limit_orders (user_id, status);"
                 )
             except psycopg2.Error as exc:
@@ -1476,6 +1497,106 @@ def mark_limit_filled(order_id: int, fill_tx_hash: str) -> bool:
     except psycopg2.Error as exc:
         logger.error("mark_limit_filled failed: %s", exc)
         return False
+
+
+
+# ---------------------------------------------------------------------------
+# P-OpsiA: Smart Buy Orders (LLM-driven limit-buy engine)
+# ---------------------------------------------------------------------------
+
+def insert_smart_buy_order(user_id: int, token_address: str, token_name: str,
+                           amount_wei: int, target_entry_usd: float,
+                           expires_at, source: str = "llm") -> int | None:
+    """Queue an LLM-driven smart-buy order (PENDING). Returns order id or None."""
+    query = """
+    INSERT INTO user_smart_buy_orders
+        (user_id, token_address, token_name, amount_wei, target_entry_usd, expires_at, source)
+    VALUES (%s, %s, %s, %s, %s, %s, %s)
+    RETURNING id;
+    """
+    try:
+        with _get_cursor() as cur:
+            cur.execute(query, (user_id, token_address, token_name, amount_wei,
+                                target_entry_usd, expires_at, source))
+            row = cur.fetchone()
+            return row[0] if row else None
+    except psycopg2.Error as exc:
+        logger.error("insert_smart_buy_order failed: %s", exc)
+        return None
+
+
+def fetch_smart_buy_orders(user_id: int, status: str | None = None) -> list[dict]:
+    """List a user's smart-buy orders (all statuses by default)."""
+    if status:
+        query = "SELECT * FROM user_smart_buy_orders WHERE user_id = %s AND status = %s ORDER BY created_at DESC;"
+        params = (user_id, status)
+    else:
+        query = "SELECT * FROM user_smart_buy_orders WHERE user_id = %s ORDER BY created_at DESC;"
+        params = (user_id,)
+    try:
+        with _get_cursor(dict_rows=True) as cur:
+            cur.execute(query, params)
+            return [dict(r) for r in cur.fetchall()]
+    except psycopg2.Error as exc:
+        logger.error("fetch_smart_buy_orders failed: %s", exc)
+        return []
+
+
+def fetch_smart_buy_orders_open() -> list[dict]:
+    """Return ALL pending smart-buy orders across users (worker poll loop)."""
+    try:
+        with _get_cursor(dict_rows=True) as cur:
+            cur.execute(
+                "SELECT * FROM user_smart_buy_orders WHERE status = 'PENDING' ORDER BY created_at ASC;"
+            )
+            return [dict(r) for r in cur.fetchall()]
+    except psycopg2.Error as exc:
+        logger.error("fetch_smart_buy_orders_open failed: %s", exc)
+        return []
+
+
+def cancel_smart_buy_order(order_id: int, user_id: int) -> bool:
+    """Cancel a user's own PENDING smart-buy order (idempotent, ownership-scoped)."""
+    try:
+        with _get_cursor() as cur:
+            cur.execute(
+                "UPDATE user_smart_buy_orders SET status = 'CANCELLED', executed_at = CURRENT_TIMESTAMP "
+                "WHERE id = %s AND user_id = %s AND status = 'PENDING';",
+                (order_id, user_id),
+            )
+            return cur.rowcount > 0
+    except psycopg2.Error as exc:
+        logger.error("cancel_smart_buy_order failed: %s", exc)
+        return False
+
+
+def mark_smart_buy_executed(order_id: int, tx_hash: str, executed_price_usd: float) -> bool:
+    """Mark a PENDING smart-buy order as EXECUTED with the real on-chain fill price."""
+    try:
+        with _get_cursor() as cur:
+            cur.execute(
+                "UPDATE user_smart_buy_orders SET status = 'EXECUTED', executed_at = CURRENT_TIMESTAMP, "
+                "buy_tx_hash = %s, executed_price_usd = %s WHERE id = %s AND status = 'PENDING';",
+                (tx_hash, executed_price_usd, order_id),
+            )
+            return cur.rowcount > 0
+    except psycopg2.Error as exc:
+        logger.error("mark_smart_buy_executed failed: %s", exc)
+        return False
+
+
+def expire_smart_buy_orders() -> int:
+    """Flip overdue PENDING smart-buy orders to EXPIRED. Returns count expired."""
+    try:
+        with _get_cursor() as cur:
+            cur.execute(
+                "UPDATE user_smart_buy_orders SET status = 'EXPIRED', executed_at = CURRENT_TIMESTAMP "
+                "WHERE status = 'PENDING' AND expires_at < CURRENT_TIMESTAMP;"
+            )
+            return cur.rowcount
+    except psycopg2.Error as exc:
+        logger.error("expire_smart_buy_orders failed: %s", exc)
+        return 0
 
 
 

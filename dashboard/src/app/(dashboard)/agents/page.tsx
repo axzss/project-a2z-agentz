@@ -148,6 +148,29 @@ function LimitOrdersPanel({ orders, onCancel }: { orders: any[]; onCancel: (id: 
   );
 }
 
+function SmartBuyPanel({ orders, onCancel }: { orders: any[]; onCancel: (id: number) => void }) {
+  if (!orders || orders.length === 0) return null;
+  return (
+    <div className="pt-3 border-t" style={{ borderColor: "var(--color-border-soft)" }}>
+      <p className="text-[11px] font-semibold uppercase tracking-wide mb-2" style={{ color: "var(--color-body-subtle)" }}>Pending Smart Orders</p>
+      {orders.map((o: any) => (
+        <div key={o.id} className="flex items-center justify-between py-1.5 text-sm">
+          <div className="flex items-center gap-2">
+            <SlidersHorizontal className="w-3.5 h-3.5" style={{ color: "var(--color-fg-cyan)" }} />
+            <span style={{ color: "var(--color-heading)" }}>{o.token_name}</span>
+            <span className="text-xs tabular-nums" style={{ color: "var(--color-body-subtle)" }}>
+              @{Number(o.target_entry_usd).toFixed(6)} · {o.status}
+            </span>
+          </div>
+          {o.status === "PENDING" && (
+            <button onClick={() => onCancel(o.id)} className="text-[10px] font-semibold hover:underline" style={{ color: "var(--color-fg-danger)" }}>Cancel</button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function AgentHero({ name, role, icon: Icon, color, bg, status, health, spark, isPaused }: {
   name: string; role: string; icon: typeof Bot; color: string; bg: string;
   status: string; health: AgentHealth; spark: number[]; isPaused?: boolean;
@@ -214,6 +237,7 @@ export default function AgentsPage() {
   const [netMode, setNetMode] = useState<"mainnet" | "testnet">("mainnet");
   const [sellToken, setSellToken] = useState<any>(null);
   const [limitOrders, setLimitOrders] = useState<any[]>([]);
+  const [smartBuys, setSmartBuys] = useState<any[]>([]);
 
   useEffect(() => {
     apiFetch("/api/holdings?network=" + netMode).then(setHoldings).catch(() => {});
@@ -224,6 +248,12 @@ export default function AgentsPage() {
   useEffect(() => {
     apiFetch("/api/limit-orders").then((d: any) => setLimitOrders(Array.isArray(d) ? d : [])).catch(() => {});
     const interval = setInterval(() => apiFetch("/api/limit-orders").then((d: any) => setLimitOrders(Array.isArray(d) ? d : [])).catch(() => {}), 15000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    apiFetch("/api/smart-buy").then((d: any) => setSmartBuys(Array.isArray(d) ? d : [])).catch(() => {});
+    const interval = setInterval(() => apiFetch("/api/smart-buy").then((d: any) => setSmartBuys(Array.isArray(d) ? d : [])).catch(() => {}), 15000);
     return () => clearInterval(interval);
   }, []);
 
@@ -417,6 +447,11 @@ export default function AgentsPage() {
               <LimitOrdersPanel orders={limitOrders} onCancel={async (id) => {
               try { await apiFetch("/api/limit-orders/cancel", { method: "POST", body: JSON.stringify({ order_id: id }) }); } catch { /* ignore */ }
               setLimitOrders((prev) => prev.map((o) => o.id === id ? { ...o, status: "CANCELLED" } : o));
+              }} />
+
+              <SmartBuyPanel orders={smartBuys} onCancel={async (id) => {
+              try { await apiFetch("/api/smart-buy/cancel", { method: "POST", body: JSON.stringify({ order_id: id }) }); } catch { /* ignore */ }
+              setSmartBuys((prev) => prev.map((o) => o.id === id ? { ...o, status: "CANCELLED" } : o));
               }} />
 
               {sellToken && <SellModal token={sellToken} onClose={() => setSellToken(null)} />}

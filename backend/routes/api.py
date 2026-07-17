@@ -1236,6 +1236,124 @@ async def cancel_limit_order(request: Request):
     return JSONResponse({"cancelled": ok})
 
 
+# ---------------------------------------------------------------------------
+# P-OpsiA: Smart Buy Engine (LLM-driven limit buys)
+# ---------------------------------------------------------------------------
+
+@require_auth
+async def list_smart_buys(request: Request):
+    """GET — list the caller's smart-buy orders (all statuses)."""
+    uid = _get_uid(request)
+    if uid is None:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    orders = database.fetch_smart_buy_orders(uid)
+    return JSONResponse([_smart_buy_dto(o) for o in orders])
+
+
+@require_auth
+async def create_smart_buy(request: Request):
+    """POST {token_address, amount_usd, target_entry_usd, ttl_hours?} — queue a smart-buy.
+
+    Normally the LLM (Agent A) creates these; this endpoint supports source='manual'
+    for future UX but mirrors the same guards (ownership, budget, expiry).
+    """
+    uid = _get_uid(request)
+    if uid is None:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+
+    token = (body.get("token_address") or "").strip()
+    if not token or not token.startswith("0x") or len(token) != 42:
+        return JSONResponse({"error": "valid token_address required"}, status_code=400)
+    try:
+        amount_usd = float(body.get("amount_usd") or 0)
+        target = float(body.get("target_entry_usd") or 0)
+    except (TypeError, ValueError):
+        return JSONResponse({"error": "amount_usd and target_entry_usd must be numeric"}, status_code=400)
+    if amount_usd <= 0 or target <= 0:
+        return JSONResponse({"error": "amount_usd and target_entry_usd must be > 0"}, status_code=400)
+    # Budget guard (aligned with Agent B buy size).
+    _cap = float(os.getenv("AGENT_B_MAX_TX_USD", "2.0"))
+    if amount_usd > _cap:
+        return JSONResponse({"error": f"amount_usd exceeds cap {_cap}"}, status_code=400)
+    ttl = float(body.get("ttl_hours") or os.getenv("SMART_BUY_TTL_HOURS", "4"))
+    try:
+        from datetime import datetime, timedelta, timezone
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=ttl)
+    except Exception:
+        return JSONResponse({"error": "invalid ttl_hours"}, status_code=400)
+
+    oid = database.insert_smart_buy_order(
+        user_id=uid, token_address=token, token_name=body.get("token_name") or "Unknown",
+        amount_wei=_usd_to_wei_real(amount_usd), target_entry_usd=target,
+        expires_at=expires_at, source="manual",
+    )
+    if not oid:
+        return JSONResponse({"error": "failed to queue order"}, status_code=500)
+    return JSONResponse({"id": oid, "status": "PENDING", "target_entry_usd": target, "expires_at": expires_at.isoformat()})
+
+
+@require_auth
+async def cancel_smart_buy(request: Request):
+    """POST {order_id} — cancel the caller's own PENDING smart-buy order."""
+    uid = _get_uid(request)
+    if uid is None:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+    oid = int(body.get("order_id") or 0)
+    if oid <= 0:
+        return JSONResponse({"error": "order_id required"}, status_code=400)
+    ok = database.cancel_smart_buy_order(oid, uid)
+    return JSONResponse({"cancelled": ok})
+
+
+@require_auth
+async def admin_list_smart_buys(request: Request):
+    """GET (?status=) — admin view of ALL smart-buy orders across users."""
+    admin = request.headers.get("X-Admin-Token")
+    if not ADMIN_TOKEN or not admin or admin != ADMIN_TOKEN:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    status = request.query_params.get("status")
+    # Admin sees everything: reuse open-fetch when filtered, else scan via per-user.
+    if status == "PENDING":
+        rows = database.fetch_smart_buy_orders_open()
+    else:
+        # No global list helper; aggregate via open + a lightweight scan.
+        rows = database.fetch_smart_buy_orders_open()
+        if not status:
+            # include non-pending too (best-effort admin visibility)
+            try:
+                with database._get_cursor(dict_rows=True) as cur:
+                    cur.execute("SELECT * FROM user_smart_buy_orders ORDER BY created_at DESC LIMIT 500;")
+                    rows = [dict(r) for r in cur.fetchall()]
+            except Exception:
+                pass
+    return JSONResponse([_smart_buy_dto(o) for o in rows])
+
+
+def _smart_buy_dto(o: dict) -> dict:
+    return {
+        "id": o.get("id"),
+        "token_address": o.get("token_address"),
+        "token_name": o.get("token_name"),
+        "amount_wei": str(o.get("amount_wei")),
+        "target_entry_usd": o.get("target_entry_usd"),
+        "status": o.get("status"),
+        "source": o.get("source"),
+        "created_at": o.get("created_at").isoformat() if o.get("created_at") else None,
+        "expires_at": o.get("expires_at").isoformat() if o.get("expires_at") else None,
+        "executed_at": o.get("executed_at").isoformat() if o.get("executed_at") else None,
+        "buy_tx_hash": o.get("buy_tx_hash"),
+        "executed_price_usd": o.get("executed_price_usd"),
+    }
+
+
 @require_auth
 async def withdraw(request: Request):
     """POST /withdraw — P5 "Sweep" (Withdraw All) of a user's OWN self-custodial
@@ -1496,4 +1614,8 @@ routes = [
     Route("/limit-orders", get_limit_orders, methods=["GET"]),
     Route("/limit-orders/cancel", cancel_limit_order, methods=["POST"]),
     Route("/withdraw", withdraw, methods=["POST"]),
+    Route("/smart-buy", list_smart_buys, methods=["GET"]),
+    Route("/smart-buy", create_smart_buy, methods=["POST"]),
+    Route("/smart-buy/cancel", cancel_smart_buy, methods=["POST"]),
+    Route("/admin/smart-buy", admin_list_smart_buys, methods=["GET"]),
 ]
