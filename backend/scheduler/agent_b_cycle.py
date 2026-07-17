@@ -32,12 +32,34 @@ from database import (
     update_task_status,
 )
 from routes.websockets import manager
-from web3_async import MultiRpcProvider, send_native_transaction, send_proof_of_execution, _usd_to_wei_real, swap_eth_for_token, swap_token_for_eth, WETH_BASE
+from web3_async import MultiRpcProvider, send_native_transaction, send_proof_of_execution, _usd_to_wei_real, swap_eth_for_token, swap_token_for_eth, WETH_BASE, get_user_wallet_account
 from eth_utils.address import to_checksum_address as _to_checksum
 
 load_dotenv()
 
 logger = logging.getLogger("a2z.agent_b")
+
+
+def _b_swap_account(user_id: "int | None"):
+    """P7 Dual Execution Mode: pick the swap signing key for a user.
+
+    - user_id None (legacy global-vault row) -> None (custodial vault)
+    - mode 'custodial'      -> None (swap_token_for_eth uses the global vault)
+    - mode 'self_custodial' -> the user's OWN decrypted P3 wallet
+
+    Returns the LocalAccount (or None). On any failure (no wallet, decrypt
+    error) it falls back to None (custodial) so the swap still executes from
+    the vault rather than blocking the agent loop. The set_execution_mode
+    guard already prevents selecting self_custodial without a P3 wallet.
+    """
+    if not user_id:
+        return None
+    try:
+        if database.get_user_execution_mode(user_id) == "self_custodial":
+            return get_user_wallet_account(user_id)
+    except Exception as exc:
+        logger.warning("P7 swap-account resolve failed for user %s (fallback vault): %s", user_id, exc)
+    return None
 
 AGENT_B_ENDPOINT = os.getenv("AGENT_B_ENDPOINT", "")
 AGENT_B_MODEL = os.getenv("AGENT_B_MODEL", "accounts/fireworks/models/deepseek-v4-pro")
@@ -983,7 +1005,10 @@ async def _check_take_profit() -> None:
 
             logger.info("TAKE PROFIT TRIGGERED: %s +%.1f%% — selling...", name, profit_pct)
             try:
-                result = await swap_token_for_eth(addr, int(token.get("amount_wei") or 0), chain_id=8453)
+                result = await swap_token_for_eth(
+                    addr, int(token.get("amount_wei") or 0), chain_id=8453,
+                    account=_b_swap_account(owner),
+                )
                 mark_token_sold(addr, result["tx_hash"])
                 # P1: platform fee on realized ETH proceeds, routed to ADMIN_VAULT.
                 # Guardrails: skipped entirely when AGENT_B_DRY_RUN=1 (demo), when
@@ -1069,7 +1094,10 @@ async def _check_limit_orders() -> None:
             amount_wei = int(o.get("amount_wei") or 0)
             if amount_wei <= 0:
                 continue
-            result = await swap_token_for_eth(addr, amount_wei, chain_id=8453)
+            result = await swap_token_for_eth(
+                addr, amount_wei, chain_id=8453,
+                account=_b_swap_account(uid),
+            )
             tx_hash = result.get("tx_hash", "")
             database.mark_token_sold(addr, tx_hash, user_id=uid)
             database.mark_limit_filled(oid, tx_hash)

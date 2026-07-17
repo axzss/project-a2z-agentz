@@ -590,7 +590,7 @@ def save_user_encrypted_wallet(user_id: int, encrypted_blob: str, generated_addr
     return False
 
 def get_user_by_id(user_id: int) -> dict:
-    query = "SELECT id, email, wallet_address, plan, plan_active_until, payment_ref, created_at, last_login_at FROM users WHERE id = %s LIMIT 1;"
+    query = "SELECT id, email, wallet_address, plan, plan_active_until, payment_ref, created_at, last_login_at, execution_mode FROM users WHERE id = %s LIMIT 1;"
     try:
         with _get_cursor() as cur:
             cur.execute(query, (user_id,))
@@ -604,12 +604,44 @@ def get_user_by_id(user_id: int) -> dict:
                     'plan_active_until': row[4].strftime('%Y-%m-%d %H:%M:%S') if row[4] else None,
                     'payment_ref': row[5],
                     'created_at': row[6].strftime('%Y-%m-%d %H:%M:%S') if row[6] else None,
-                    'last_login_at': row[7].strftime('%Y-%m-%d %H:%M:%S') if row[7] else None
+                    'last_login_at': row[7].strftime('%Y-%m-%d %H:%M:%S') if row[7] else None,
+                    'execution_mode': row[8] or 'custodial',
                 }
     except psycopg2.Error as exc:
         logger.error("get_user_by_id failed: %s", exc)
         return None
     return None
+
+
+def get_user_execution_mode(user_id: int) -> str:
+    """Return the user's execution mode: 'custodial' (default) or 'self_custodial'."""
+    user = get_user_by_id(user_id)
+    if not user:
+        return 'custodial'
+    return user.get('execution_mode') or 'custodial'
+
+
+def set_user_execution_mode(user_id: int, mode: str) -> bool:
+    """Persist the user's execution mode.
+
+    Only accepts 'custodial' or 'self_custodial'. Rejects switching to
+    self_custodial when the user has no encrypted (P3) wallet yet — they must
+    generate one first (P3). Fail-closed.
+    """
+    if mode not in ('custodial', 'self_custodial'):
+        return False
+    if mode == 'self_custodial':
+        # Guard: require a P3 wallet before allowing self-custodial execution.
+        if not get_user_encrypted_key(user_id):
+            return False
+    query = "UPDATE users SET execution_mode = %s WHERE id = %s;"
+    try:
+        with _get_cursor() as cur:
+            cur.execute(query, (mode, user_id))
+            return cur.rowcount > 0
+    except psycopg2.Error as exc:
+        logger.error("set_user_execution_mode failed for user %s: %s", user_id, exc)
+        return False
 
 
 def get_user_encrypted_key(user_id: int) -> str | None:
@@ -947,6 +979,9 @@ def ensure_pipeline_tables() -> None:
             try:
                 cur.execute(
                     "ALTER TABLE users ADD COLUMN IF NOT EXISTS auto_sell_enabled BOOLEAN NOT NULL DEFAULT FALSE;"
+                )
+                cur.execute(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS execution_mode VARCHAR(16) NOT NULL DEFAULT 'custodial';"
                 )
                 cur.execute(
                     "ALTER TABLE held_tokens ADD COLUMN IF NOT EXISTS user_id INTEGER;"
