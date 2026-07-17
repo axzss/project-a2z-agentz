@@ -1086,6 +1086,64 @@ async def set_sell_preference(request: Request):
     return JSONResponse({"auto_sell_enabled": enabled, "updated": ok})
 
 
+# ---------------------------------------------------------------------------
+# P7 Dual Execution Mode — per-user custodial vs self-custodial selection
+# ---------------------------------------------------------------------------
+
+async def _resolve_swap_account(uid: int):
+    """Return the signing account for a swap based on the user's execution_mode.
+
+    - 'custodial'      -> None (caller uses the global vault via get_account())
+    - 'self_custodial' -> the user's OWN decrypted P3 wallet (LocalAccount)
+
+    Returns (account_or_none, mode). Raises ValueError if self_custodial is
+    selected but the user has no P3 wallet (should be prevented at set time).
+    """
+    mode = database.get_user_execution_mode(uid)
+    if mode == "self_custodial":
+        try:
+            return get_user_wallet_account(uid), mode
+        except Exception as exc:
+            raise ValueError(f"self_custodial swap unavailable: {exc}")
+    return None, mode
+
+
+@require_auth
+async def get_execution_mode(request: Request):
+    """GET — return the user's current execution mode."""
+    uid = _get_uid(request)
+    if uid is None:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    return JSONResponse({"execution_mode": database.get_user_execution_mode(uid)})
+
+
+@require_auth
+async def set_execution_mode(request: Request):
+    """POST {mode: 'custodial'|'self_custodial'} — switch execution mode.
+
+    Fail-closed: switching to self_custodial requires a P3 wallet (set in DB).
+    """
+    uid = _get_uid(request)
+    if uid is None:
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"error": "Invalid JSON"}, status_code=400)
+    mode = (body.get("mode") or "").strip()
+    if mode not in ("custodial", "self_custodial"):
+        return JSONResponse({"error": "mode must be 'custodial' or 'self_custodial'"}, status_code=400)
+    if mode == "self_custodial" and not database.get_user_encrypted_key(uid):
+        return JSONResponse(
+            {"error": "Generate your self-custodial wallet first (P3) before enabling self-custodial mode"},
+            status_code=400,
+        )
+    ok = database.set_user_execution_mode(uid, mode)
+    if not ok:
+        return JSONResponse({"error": "Failed to update execution mode"}, status_code=500)
+    return JSONResponse({"execution_mode": mode, "updated": True})
+
+
 @require_auth
 async def manual_sell(request: Request):
     """POST {token_address, amount_wei?, type:"market"} — sell now at market.
@@ -1117,7 +1175,8 @@ async def manual_sell(request: Request):
         return JSONResponse({"error": "amount_wei must be > 0"}, status_code=400)
 
     try:
-        result = await swap_token_for_eth(addr, amount_wei, chain_id=8453)
+        swap_account, _mode = await _resolve_swap_account(uid)
+        result = await swap_token_for_eth(addr, amount_wei, chain_id=8453, account=swap_account)
         tx_hash = result.get("tx_hash", "")
         database.mark_token_sold(addr, tx_hash, user_id=uid)
         # P1: always skim the platform fee on realized proceeds.
@@ -1474,4 +1533,6 @@ routes = [
     Route("/limit-orders", get_limit_orders, methods=["GET"]),
     Route("/limit-orders/cancel", cancel_limit_order, methods=["POST"]),
     Route("/withdraw", withdraw, methods=["POST"]),
+    Route("/execution-mode", get_execution_mode, methods=["GET"]),
+    Route("/execution-mode", set_execution_mode, methods=["POST"]),
 ]
