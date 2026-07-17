@@ -1090,6 +1090,9 @@ async def get_sell_preference(request: Request):
     uid = _get_uid(request)
     if uid is None:
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    if _is_guest(uid):
+        from routes.mock_demo import GUEST_SETTINGS
+        return JSONResponse({"auto_sell_enabled": GUEST_SETTINGS["auto_sell_enabled"]})
     return JSONResponse({"auto_sell_enabled": database.get_sell_preference(uid)})
 
 
@@ -1099,6 +1102,8 @@ async def set_sell_preference(request: Request):
     uid = _get_uid(request)
     if uid is None:
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    if _is_guest(uid):
+        return JSONResponse({"demo": True, "message": "Demo Mode: Action Simulated", "updated": True})
     try:
         body = await request.json()
     except Exception:
@@ -1136,6 +1141,9 @@ async def get_execution_mode(request: Request):
     uid = _get_uid(request)
     if uid is None:
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    if _is_guest(uid):
+        from routes.mock_demo import GUEST_SETTINGS
+        return JSONResponse({"execution_mode": GUEST_SETTINGS["execution_mode"]})
     return JSONResponse({"execution_mode": database.get_user_execution_mode(uid)})
 
 
@@ -1148,6 +1156,8 @@ async def set_execution_mode(request: Request):
     uid = _get_uid(request)
     if uid is None:
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    if _is_guest(uid):
+        return JSONResponse({"demo": True, "message": "Demo Mode: Action Simulated", "updated": True})
     try:
         body = await request.json()
     except Exception:
@@ -1305,6 +1315,9 @@ async def list_smart_buys(request: Request):
     uid = _get_uid(request)
     if uid is None:
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    if _is_guest(uid):
+        from routes.mock_demo import GUEST_SMART_ORDERS
+        return JSONResponse([_smart_buy_dto(o) for o in GUEST_SMART_ORDERS])
     orders = database.fetch_smart_buy_orders(uid)
     return JSONResponse([_smart_buy_dto(o) for o in orders])
 
@@ -1319,6 +1332,8 @@ async def create_smart_buy(request: Request):
     uid = _get_uid(request)
     if uid is None:
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    if _is_guest(uid):
+        return JSONResponse({"demo": True, "message": "Demo Mode: Action Simulated", "id": 999, "status": "PENDING"})
     try:
         body = await request.json()
     except Exception:
@@ -1361,6 +1376,8 @@ async def cancel_smart_buy(request: Request):
     uid = _get_uid(request)
     if uid is None:
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
+    if _is_guest(uid):
+        return JSONResponse({"demo": True, "message": "Demo Mode: Action Simulated", "cancelled": True})
     try:
         body = await request.json()
     except Exception:

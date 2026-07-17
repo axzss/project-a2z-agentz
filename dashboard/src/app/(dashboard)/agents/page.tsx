@@ -7,6 +7,7 @@ import { Sparkline } from "@/components/ui/Sparkline";
 import { Bot, Shield, Activity, Zap, Clock, CheckCircle2, XCircle, ListChecks, Pause, Play, Link2, TrendingUp, Wallet, ArrowUpRight, Coins, DollarSign, SlidersHorizontal } from "lucide-react";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { useToast } from "@/components/ui/Toast";
 
 function genSpark(base: number, n = 12): number[] {
   // Deterministic placeholder; real history is fed from agent activity.
@@ -232,18 +233,18 @@ function AgentHero({ name, role, icon: Icon, color, bg, status, health, spark, i
 }
 
 export default function AgentsPage() {
+  const { toast } = useToast();
   const { agentAStatus, agentBStatus, isPaused, setIsPaused, agentHealth, agentMessages } = useDashboard();
   const [holdings, setHoldings] = useState<any>(null);
-  const [netMode, setNetMode] = useState<"mainnet" | "testnet">("mainnet");
   const [sellToken, setSellToken] = useState<any>(null);
   const [limitOrders, setLimitOrders] = useState<any[]>([]);
   const [smartBuys, setSmartBuys] = useState<any[]>([]);
 
   useEffect(() => {
-    apiFetch("/api/holdings?network=" + netMode).then(setHoldings).catch(() => {});
-    const interval = setInterval(() => apiFetch("/api/holdings?network=" + netMode).then(setHoldings).catch(() => {}), 15000);
+    apiFetch("/api/holdings?network=mainnet").then(setHoldings).catch(() => {});
+    const interval = setInterval(() => apiFetch("/api/holdings?network=mainnet").then(setHoldings).catch(() => {}), 15000);
     return () => clearInterval(interval);
-  }, [netMode]);
+  }, []);
 
   useEffect(() => {
     apiFetch("/api/limit-orders").then((d: any) => setLimitOrders(Array.isArray(d) ? d : [])).catch(() => {});
@@ -326,35 +327,10 @@ export default function AgentsPage() {
           <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "var(--color-neutral-secondary-medium)", color: "var(--color-body-subtle)" }}>
             {holding.length} holding · {sold.length} sold
           </span>
-          {/* Network toggle: Mainnet (DB) vs Testnet (live Base Sepolia on-chain) */}
-          <div className="ml-auto flex items-center gap-1 text-[11px] rounded-full p-0.5" style={{ background: "var(--color-neutral-secondary-medium)" }}>
-            <button
-              onClick={() => setNetMode("mainnet")}
-              className="px-2.5 py-1 rounded-full font-semibold transition-colors"
-              style={{
-                background: netMode === "mainnet" ? "var(--color-fg-cyan)" : "transparent",
-                color: netMode === "mainnet" ? "#04141f" : "var(--color-body-subtle)",
-              }}
-            >
-              Mainnet
-            </button>
-            <button
-              onClick={() => setNetMode("testnet")}
-              className="px-2.5 py-1 rounded-full font-semibold transition-colors"
-              style={{
-                background: netMode === "testnet" ? "var(--color-fg-purple)" : "transparent",
-                color: netMode === "testnet" ? "#1a0b2e" : "var(--color-body-subtle)",
-              }}
-            >
-              Testnet
-            </button>
-          </div>
+          <span className="ml-auto text-[11px] px-2.5 py-1 rounded-full font-semibold" style={{ background: "var(--color-fg-cyan)", color: "#04141f" }}>
+            Base Mainnet
+          </span>
         </div>
-        {netMode === "testnet" && (
-          <p className="text-[11px]" style={{ color: "var(--color-fg-purple)" }}>
-            Live on-chain Base Sepolia balance (no database) — {holdings?.proof_only ? "proof-only mode" : "showing A2ZTestToken held by vault"}
-          </p>
-        )}
 
         {holding.length === 0 ? (
           <p className="text-sm" style={{ color: "var(--color-body-subtle)" }}>No tokens held. Agent B will auto-buy when a token scores ≥60.</p>
@@ -445,12 +421,18 @@ export default function AgentsPage() {
               )}
 
               <LimitOrdersPanel orders={limitOrders} onCancel={async (id) => {
-              try { await apiFetch("/api/limit-orders/cancel", { method: "POST", body: JSON.stringify({ order_id: id }) }); } catch { /* ignore */ }
+              try {
+                const res: any = await apiFetch("/api/limit-orders/cancel", { method: "POST", body: JSON.stringify({ order_id: id }) });
+                if (res && res.demo) { toast({ type: "info", title: "Demo Mode", description: "Action Simulated" }); return; }
+              } catch { /* ignore */ }
               setLimitOrders((prev) => prev.map((o) => o.id === id ? { ...o, status: "CANCELLED" } : o));
               }} />
 
               <SmartBuyPanel orders={smartBuys} onCancel={async (id) => {
-              try { await apiFetch("/api/smart-buy/cancel", { method: "POST", body: JSON.stringify({ order_id: id }) }); } catch { /* ignore */ }
+              try {
+                const res: any = await apiFetch("/api/smart-buy/cancel", { method: "POST", body: JSON.stringify({ order_id: id }) });
+                if (res && res.demo) { toast({ type: "info", title: "Demo Mode", description: "Action Simulated" }); return; }
+              } catch { /* ignore */ }
               setSmartBuys((prev) => prev.map((o) => o.id === id ? { ...o, status: "CANCELLED" } : o));
               }} />
 

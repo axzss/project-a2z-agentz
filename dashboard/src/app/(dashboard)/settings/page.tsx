@@ -7,8 +7,10 @@ import PageHeader from "@/components/PageHeader";
 import { Settings, CreditCard, Bot } from "lucide-react";
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
+import { useToast } from "@/components/ui/Toast";
 
 function AutoSellToggle() {
+  const { toast } = useToast();
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
@@ -25,10 +27,11 @@ function AutoSellToggle() {
     setMsg("");
     const next = !enabled;
     try {
-      await apiFetch("/api/sell-preference", {
+      const res: any = await apiFetch("/api/sell-preference", {
         method: "POST",
         body: JSON.stringify({ enabled: next }),
       });
+      if (res && res.demo) { toast({ type: "info", title: "Demo Mode", description: "Action Simulated" }); return; }
       setEnabled(next);
       setMsg(next ? "Auto-Sell Agent ON — bot may take profit automatically." : "Auto-Sell Agent OFF — you keep full control of your vault.");
     } catch (e: any) {
@@ -68,6 +71,7 @@ function AutoSellToggle() {
 }
 
 function ExecutionModeToggle() {
+  const { toast } = useToast();
   const [mode, setMode] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
@@ -83,10 +87,11 @@ function ExecutionModeToggle() {
     setBusy(true);
     setMsg("");
     try {
-      await apiFetch("/api/execution-mode", {
+      const res: any = await apiFetch("/api/execution-mode", {
         method: "POST",
         body: JSON.stringify({ mode: next }),
       });
+      if (res && res.demo) { toast({ type: "info", title: "Demo Mode", description: "Action Simulated" }); return; }
       setMode(next);
       setMsg(
         next === "self_custodial"
